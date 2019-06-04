@@ -64,7 +64,7 @@ asmpipe.py #Run pipeline
 
 ## Output
 
-The following output-files are created when running SNParison:
+The following output-files are created when running AsmPipe:
 
 * Fastq_raw: Any FASTQ-files that have been processed are placed here
 * trimmed_reds: The trimmed reads from TrimGalore are placed here
