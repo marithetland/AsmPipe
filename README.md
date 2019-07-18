@@ -1,6 +1,6 @@
 # AsmPipe
 
-NOTE: This is still under development, there might be bugs...
+NOTE: This is still under development, there might be bugs when using nondefault options...
 
 Pipeline of tools used for quality assessment, assembly and gene detection from short-read Illumina sequences. Created for easy use at our microbiology research lab at Stavanger University Hopsital.
 
