@@ -343,23 +343,28 @@ def main():
                     try:
                         fasta=(current_dir+'assembly/'+item+'_assembly/'+item+'_assembly.fasta')
                         trim_1=(current_dir+'trimmed_reads/'+item+'_1_val_1.fq.gz')
-                        trim_2=(current_dir +'trimmed_reads/'+item+'_2_val_2.fq.gz')
+                        trim_2=(current_dir+'trimmed_reads/'+item+'_2_val_2.fq.gz')
+                        indi_outfile=(current_dir+'QC/Coverage/'+item+'_X.tsv') 
                         outfile=(current_dir+'QC/Coverage/overall_coverage.tsv') 
-                        run_command(['bwa index ', fasta], shell= True)              
+                        run_command(['bwa index ', fasta], shell= True)
+                        
                         run_command(['bwa mem -t 8 ',fasta,' ',trim_1,' ',trim_2,' > input_c.sam  ; \
                             picard SamFormatConverter INPUT=input_c.sam VALIDATION_STRINGENCY=SILENT OUTPUT=input_c.bam ; \
                             picard SortSam INPUT=input_c.bam OUTPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT SORT_ORDER=coordinate ; \
                             picard MarkDuplicates INPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam METRICS_FILE=dup_metrics ; \
                             picard BuildBamIndex INPUT=final_cont.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam.bai ' ], shell= True)
                             
-                        run_command(["echo -n '",item," \t' >> ",outfile," ; tot_size=$(samtools view -H final_cont.bam | grep -P '^@SQ' | cut -f 3 -d ':' | awk '{sum+=$1} END {print sum}') ; echo $tot_size ; samtools depth final_cont.bam | awk -v var=$tot_size '{sum+=$3; sumsq+=$3*$3} END {print sum/var \"\t\" sqrt(sumsq/var - (sum/var)**2)}' >> ",outfile," \
-                            ; rm final_cont* dup_m* input* "  ], shell= True)
+                        run_command(["echo -n '",item," \t' >> ",indi_outfile," ; tot_size=$(samtools view -H final_cont.bam | grep -P '^@SQ' | cut -f 3 -d ':' | awk '{sum+=$1} END {print sum}') ; echo $tot_size ; samtools depth final_cont.bam |awk -v var=$tot_size '{sum+=$3; sumsq+=$3*$3} END {print sum/var \"\t\" sqrt(sumsq/var - (sum/var)**2)}' >> ",indi_outfile," ; rm final_cont* dup_m* input* "  ], shell= True)
                         logging.info(item+": Coverage calculation success.")
                         run_command(['touch ',current_dir,'QC/Coverage/',item,'_Coverage.Success'], shell= True)
+
                     except:
                         logging.info(item+": Coverage-calculation unsuccessful. Removing from downstream analysis.")
                         sequence_list.remove(item)
                         unsuccessful_sequences.append(item)
+            outfile=(current_dir+'QC/Coverage/overall_coverage.tsv') 
+            cov_files=(current_dir+'QC/Coverage/*_X.tsv') 
+            run_command(['cat ',cov_files,' >> ',outfile], shell= True)    
             
         #Run kleborate
         #ToDO: integrate Kleborate in final report
