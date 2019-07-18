@@ -24,6 +24,7 @@ from shutil import copyfile
 import datetime
 from argparse import ArgumentParser
 import pandas as pd
+from pathlib import Path
 from subprocess import call
 
 #Defs
@@ -32,11 +33,16 @@ def parse_args():
     parser = ArgumentParser(description='AMR-NGS')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + "v.1.0.0")
     
-    input_args = parser.add_argument_group('Input options (required)')
-    input_args.add_argument('--noqc', action='store_true', required=False, help='Do not run fastQC and multiQC')
-    
-    return parser.parse_args()
+    parser.add_argument('-t','--threads', type=int, default=4, required=False, help='Specify threads to use. Default: 4')
+    parser.add_argument('--noex', action='store_true', required=False, help='Do not run fastQC, multiQC, Quast, MLST or Coverage calculation.')
+    parser.add_argument('--nofqc', action='store_true', required=False, help='Do not run fastQC and multiQC')
+    parser.add_argument('--nomlst', action='store_true', required=False, help='Do not run MLST')
+    parser.add_argument('--noquast', action='store_true', required=False, help='Do not run Quast')
+    parser.add_argument('--nocov', action='store_true', required=False, help='Do not calculate X')
 
+    parser.add_argument('--klebs', action='store_true', required=False, help='Run Kleborate')
+
+    return parser.parse_args()
 
 
 def createFolder(directory):
@@ -88,19 +94,47 @@ def main():
     logging.info('Running assemblyPipe v.1.0.0')
     logging.info('command line: {0}'.format(' '.join(sys.argv)))
     
+    #Arguments
+    if not args.threads:
+        threads=str(4)
+    else:
+        threads=str(args.threads)
+    print('Using '+ str(threads) + ' threads')
+
+    if args.noex:
+        print('Trimming and assembling reads only, no QC or downstream analyses.')
+    if args.nofqc:
+        print('Trimming and assembling reads only, no QC or downstream analyses.')
+    if args.nomlst:
+        print('MLST will not be run.')
+    if args.noquast:
+        print('Quast will not be run.')
+    if args.nocov:
+        print('Coverage will not be calculated.')
+    
+    if not args.noex and not args.nofqc and not args.nomlst and not args.noquast and not args.nocov and not args.klebs:
+        print("Pipeline will be run with: TrimGalore, fastQC, multiQC, Unicycler, Quast, mlst and coverage calculation.")
+    if not args.noex and not args.nofqc and not args.nomlst and not args.noquast and not args.nocov and args.klebs:
+        print("Pipeline will be run with: TrimGalore, fastQC, multiQC, Unicycler, Quast, mlst, coverage calculation and kleborate.")
+    else:
+        if args.klebs:
+            print('Kleborate will be run on all samples.')
+
     #Set current working directory
     current_dir = os.getcwd()
     if current_dir[-1] != '/':
         current_dir = current_dir + '/'
     #Checking file extensions
+    fastq_raw=(current_dir+'Fastq_raw')
+    for filename in glob.glob(os.path.join(fastq_raw, '*fastq.gz')):
+        shutil.move(filename, current_dir)
     if any(File.endswith(".fastq.gz") for File in os.listdir(current_dir)):
         logging.info('Input files are *.fastq.gz')
         #Rename files if named *_R?_001
         if any(File.endswith(".fastq.gz") for File in os.listdir(current_dir)):
             run_command(["rename 's/_R1_001/_1/g' ",current_dir,"*R1* && rename 's/_R2_001/_2/g' ",current_dir,"*R2*"], shell=True)
-
         #Add all sequences to sequence_list
-        sequences = glob.glob("*fastq.gz")  #Only works for gzipped files currently
+        sequences = glob.glob("*fastq.gz")  #Only works for .fastq.gz suffix currently
         sequence_list = []
         for sequence in sequences:
             name = sequence.replace(".gz","")
@@ -173,7 +207,7 @@ def main():
                     unsuccessful_sequences.append(item)
 
         #Run FastQC and multiQC
-        if not args.noqc:
+        if not args.nofqc and not args.noex:
             logging.info('Running FastQC')
             createFolder(current_dir+'QC/fastQC') 
             createFolder(current_dir+'QC/multiqc_trimmed') 
@@ -231,7 +265,7 @@ def main():
                 for item in uniq_run_list:
                     f.write("%s\n" % item)
             try:
-                run_command(["cd ",trimmed_dir," ; parallel --jobs 22 'echo {} ; unicycler -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
+                run_command(["cd ",trimmed_dir," ; parallel --jobs ",threads," 'echo {} ; unicycler -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
                      -o ../assembly/{}_assembly --verbosity 2 --keep 2 ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; cd ",current_dir], shell=True)
             except:
                 logging.info(": Assembly unsuccessful.") # Removing from downstream analysis.")
@@ -263,77 +297,93 @@ def main():
             pass
        
         #Run Quast
-        logging.info('Running Quast on assemblies')
-        createFolder(current_dir+'QC/Quast')
-        try:
-            run_command(['quast.py ',current_dir,'assemblies/*fasta -o ',current_dir,'QC/Quast > ',current_dir,'logs/quast_',todays_date,'.log 2>&1'], shell=True)
-            logging.info("Quast successful")
-            logging.info('Remember to open the transposed_report.tsv file to assess the quality of your assembled reads - main points to look at: Total contigs (<700, GC% (should match the species), total length (should match the species), and have a general look at largest contig, N50 and L50 values.')
-            #Create Quast report
-            quast_report = pd.read_csv(current_dir+'QC/Quast/transposed_report.tsv', sep='\t')
-            for index, row in quast_report.iterrows():
-                contigs = row[1]
-                if contigs > 700:
-                    print("NOTE: More than 700 contigs in "+row[0]+". Resequencing adviced.")
-                elif contigs > 400 and contigs < 700:
-                    print("NOTE: More than 400 contigs in "+row[0]+". Consider resequencing.")
-        except:
-            logging.info("Quast unsuccessful.")
+        if not args.noquast and not args.noex:
+            logging.info('Running Quast on assemblies')
+            createFolder(current_dir+'QC/Quast')
+            try:
+                run_command(['quast.py ',current_dir,'assemblies/*fasta -o ',current_dir,'QC/Quast > ',current_dir,'logs/quast_',todays_date,'.log 2>&1'], shell=True)
+                logging.info("Quast successful")
+                logging.info('Remember to open the transposed_report.tsv file to assess the quality of your assembled reads - main points to look at: Total contigs (<700, GC% (should match the species), total length (should match the species), and have a general look at largest contig, N50 and L50 values.')
+                #Create Quast report
+                quast_report = pd.read_csv(current_dir+'QC/Quast/transposed_report.tsv', sep='\t')
+                for index, row in quast_report.iterrows():
+                    contigs = row[1]
+                    if contigs > 700:
+                        print("NOTE: More than 700 contigs in "+row[0]+". Resequencing adviced.")
+                    elif contigs > 400 and contigs < 700:
+                        print("NOTE: More than 400 contigs in "+row[0]+". Consider resequencing.")
+            except:
+                logging.info("Quast unsuccessful.")
         
         #Get species and ST
-        logging.info('Looking for MLST')
-        try:
-            run_command(['cd ',current_dir,'assemblies/ ; mlst *fasta > mlst.tsv ; cd ',current_dir], shell= True)
-            logging.info("Species and MLST identification success")
-        except:
-            logging.info("Species and MLST identification failed. Check input-directory. Alternatively, run mlst manually on the terminal in the ./assemblies-directory: 'mlst *fasta >> mlst.tsv '")
+        if not args.nomlst and not args.noex:
+            logging.info('Looking for MLST')
+            try:
+                run_command(['cd ',current_dir,'assemblies/ ; mlst *fasta > mlst.tsv ; cd ',current_dir], shell= True)
+                logging.info("Species and MLST identification success")
+            except:
+                logging.info("Species and MLST identification failed. Check input-directory. Alternatively, run mlst manually on the terminal in the ./assemblies-directory: 'mlst *fasta >> mlst.tsv '")
 
         #Get average coverage and std deviation
-        run_list = []
-        for seq in sequence_list:
-            if os.path.isfile(current_dir + 'QC/Coverage/'+seq+'_Coverage.Success'):
-                logging.info(seq+": Coverage has been calculated.")
-            else:
-                run_list.append(seq)
-                logging.info(seq+": Coverage has not been calculated.")
-        
-        if run_list:
-            createFolder(current_dir+'QC/Coverage') 
-            logging.info("Calculating average coverage of each sample")
-            uniq_run_list = set(run_list)
-            for item in uniq_run_list: 
-                logging.info(item)
-                try:
-                    fasta=(current_dir+'assembly/'+item+'_assembly/'+item+'_assembly.fasta')
-                    trim_1=(current_dir+'trimmed_reads/'+item+'_1_val_1.fq.gz')
-                    trim_2=(current_dirls +'trimmed_reads/'+item+'_2_val_2.fq.gz')
-                    outfile=(current_dir+'QC/Coverage/overall_coverage.tsv') 
-                    run_command(['bwa index ', fasta], shell= True)              
-                    run_command(['bwa mem -t 8 ',fasta,' ',trim_1,' ',trim_2,' > input_c.sam  ; \
-                        picard SamFormatConverter INPUT=input_c.sam VALIDATION_STRINGENCY=SILENT OUTPUT=input_c.bam ; \
-                        picard SortSam INPUT=input_c.bam OUTPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT SORT_ORDER=coordinate ; \
-                        picard MarkDuplicates INPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam METRICS_FILE=dup_metrics ; \
-                        picard BuildBamIndex INPUT=final_cont.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam.bai ' ], shell= True)
-                        
-                    run_command(["echo -n '",item," \t' >> ",outfile," ; tot_size=$(samtools view -H final_cont.bam | grep -P '^@SQ' | cut -f 3 -d ':' | awk '{sum+=$1} END {print sum}') ; echo $tot_size ; samtools depth final_cont.bam | awk -v var=$tot_size '{sum+=$3; sumsq+=$3*$3} END {print sum/var \"\t\" sqrt(sumsq/var - (sum/var)**2)}' >> ",outfile," \
-                        ; rm final_cont* dup_m* input* "  ], shell= True)
-                    logging.info(item+": Coverage calculation success.")
-                    run_command(['touch ',current_dir,'QC/Coverage/',item,'_Coverage.Success'], shell= True)
-                except:
-                    logging.info(item+": Coverage-calculation unsuccessful. Removing from downstream analysis.")
-                    sequence_list.remove(item)
-                    unsuccessful_sequences.append(item)
+        if not args.nocov and not args.noex:
+            run_list = []
+            for seq in sequence_list:
+                if os.path.isfile(current_dir + 'QC/Coverage/'+seq+'_Coverage.Success'):
+                    logging.info(seq+": Coverage has been calculated.")
+                else:
+                    run_list.append(seq)
+                    logging.info(seq+": Coverage has not been calculated.")
+            
+            if run_list:
+                createFolder(current_dir+'QC/Coverage') 
+                logging.info("Calculating average coverage of each sample")
+                uniq_run_list = set(run_list)
+                for item in uniq_run_list: 
+                    logging.info(item)
+                    try:
+                        fasta=(current_dir+'assembly/'+item+'_assembly/'+item+'_assembly.fasta')
+                        trim_1=(current_dir+'trimmed_reads/'+item+'_1_val_1.fq.gz')
+                        trim_2=(current_dir +'trimmed_reads/'+item+'_2_val_2.fq.gz')
+                        outfile=(current_dir+'QC/Coverage/overall_coverage.tsv') 
+                        run_command(['bwa index ', fasta], shell= True)              
+                        run_command(['bwa mem -t 8 ',fasta,' ',trim_1,' ',trim_2,' > input_c.sam  ; \
+                            picard SamFormatConverter INPUT=input_c.sam VALIDATION_STRINGENCY=SILENT OUTPUT=input_c.bam ; \
+                            picard SortSam INPUT=input_c.bam OUTPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT SORT_ORDER=coordinate ; \
+                            picard MarkDuplicates INPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam METRICS_FILE=dup_metrics ; \
+                            picard BuildBamIndex INPUT=final_cont.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam.bai ' ], shell= True)
+                            
+                        run_command(["echo -n '",item," \t' >> ",outfile," ; tot_size=$(samtools view -H final_cont.bam | grep -P '^@SQ' | cut -f 3 -d ':' | awk '{sum+=$1} END {print sum}') ; echo $tot_size ; samtools depth final_cont.bam | awk -v var=$tot_size '{sum+=$3; sumsq+=$3*$3} END {print sum/var \"\t\" sqrt(sumsq/var - (sum/var)**2)}' >> ",outfile," \
+                            ; rm final_cont* dup_m* input* "  ], shell= True)
+                        logging.info(item+": Coverage calculation success.")
+                        run_command(['touch ',current_dir,'QC/Coverage/',item,'_Coverage.Success'], shell= True)
+                    except:
+                        logging.info(item+": Coverage-calculation unsuccessful. Removing from downstream analysis.")
+                        sequence_list.remove(item)
+                        unsuccessful_sequences.append(item)
+            
+        #Run kleborate
+        #ToDO: integrate Kleborate in final report
+        if args.klebs:
+            try:
+                run_command(['kleborate --all -a ',current_dir,'assemblies/*fasta'], shell= True) 
+            except:
+                print("Kleborate failed, do you have kleborate in your path?")
+                pass
+
         logging.info("Creating lists of successful and unsuccessful sequences, see 'successful_sequences.txt' and 'failed_sequences.txt'.")
         with open("successful_sequences.txt","w") as seq_suc:
             seq_suc.write(("\n".join([str(i) for i in sequence_list] )))
         with open("failed_sequences.txt","w") as seq_unsuc:
             seq_unsuc.write(("\n".join([str(i) for i in unsuccessful_sequences] )))
-
+        
     else:
         logging.info('ERROR: Please provide input files in fastq.gz format. If your FASTQ files are separated into one folder for each read (like when downloaded from basespace), copy and paste the following into the command line: mv */* ./ ; find . -type d -empty -delete ')
 
     ###Creating output-file
     seq_df = pd.DataFrame(sequence_list, columns=["Assembly"])  #Created first col with seqname for each file
+    
+    #need to tweak for options
+    #mlst
     mlst_file = pd.read_csv(current_dir+'assemblies/mlst.tsv', sep='\t', header=None)
     mlst_file.columns = ['Assembly','species','ST','al1','al2','al3','al4','al5','al6','al7']
     mlst_df = mlst_file.replace("_assembly.fasta","", regex=True)
