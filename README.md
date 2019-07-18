@@ -30,7 +30,7 @@ These need to be installed for the entire pipeline to work. Other versions of th
 * Pilon v1.22 (https://www.broadinstitute.org/gaag/pilon)
 * Unicycler v0.4.4 (https://github.com/rrwick/Unicycler)
 * Quast v4.6.3 (http://quast.sourceforge.net/quast)
-* mlst v2.16.2 (ttps://github.com/tseemann/mlst)
+* mlst v2.16.2 (https://github.com/tseemann/mlst)
 * BWA v0.7.17-r1188 (http://bio-bwa.sourceforge.net/)
 * SAMtools v1.7 (http://www.htslib.org/download/)
 * PicardTools v2.17.8-SNAPSHOT (https://broadinstitute.github.io/picard/)
