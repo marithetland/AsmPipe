@@ -19,19 +19,23 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 [Output](#Output)  
 
 ## Requirements
+These need to be installed for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the I have tested with.
 
 * Linux or MacOS
 * Python 3.5.0+
-* FastQC
-* TrimGalore
-* SPAdes
-* Unicycler
-* Quast
-* mlst
-* kleborate
-* BWA
-* SAMtools
-* PicardTools
+* FastQC v0.11.7 (https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
+* MultiQC v1.7 (https://multiqc.info/)
+* TrimGalore v0.5.0 (https://www.bioinformatics.babraham.ac.uk/projects/trim_galore/)
+* SPAdes v3.13.0 (http://cab.spbu.ru/software/spades/)
+* Pilon v1.22 (https://www.broadinstitute.org/gaag/pilon)
+* Unicycler v0.4.4 (https://github.com/rrwick/Unicycler)
+* Quast v4.6.3 (http://quast.sourceforge.net/quast)
+* mlst v2.16.2 (ttps://github.com/tseemann/mlst)
+* BWA v0.7.17-r1188 (http://bio-bwa.sourceforge.net/)
+* SAMtools v1.7 (http://www.htslib.org/download/)
+* PicardTools v2.17.8-SNAPSHOT (https://broadinstitute.github.io/picard/)
+* Optional: Kleborate v0.3.0 (https://github.com/katholt/Kleborate)
+
 
 ## Usage
 
