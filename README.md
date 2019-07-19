@@ -15,8 +15,9 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 
 [Requirements](#Requirements)  
 [Usage](#Usage)  
-[ExampleCommand](#Example-command)  
+[Example Command](#Example-command)  
 [Output](#Output)  
+[Detailed Explanation](#DetailedExplanation)
 
 ## Requirements
 These need to be installed for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the I have tested with.
@@ -91,3 +92,21 @@ The following output-files are created when running AsmPipe:
 * failed_sequences.txt: List of any samples that failed any stage of the pipeline
 * logs: Will contain run-logs from each tool for each sample
 * AsmPipe_date_time.csv: Overall summary report of: Species, ST, no. reads, GC%, no. contigs, largest contig, total sequence length, N50, L50 and sequence depth.
+
+
+## Detailed explanation
+
+* FastQC performs quality assessment of raw reads, indicating number of reads, GC%, adapter content, sequence length distribution, and more
+* TrimGalore - trims raw reads based on adapter sequences and Phred quality: trims 1 bp off 3' end of every read, removes low-quality (<Phred 20) 3' ends, removes adapter sequences and removes read-pairs if either of the reads' length is <20 bp
+* Unicycler functions as a SPAdes optimiser with short-reads only, and pilon polishing attempts to make imporvements on the genome
+* Quast quality assessment on assembly outputs the total length, GC%, number of contigs, N50, L50 and more. 
+* MLST attempts to identify species and mlst based on the PubMLST schemes. Other tools may be needed for specification, e.g. Kleborate identifies locus variants for Klebsiella samples and separates klebsiella pneumoniae sensu lato into subspecies
+* Sequencing depth (X) - maps the reads against their assembled fasta-file to calculate the overall average depth of the genome.
+
+Things to check QC-wise
+* That GC% matches the sample species
+* That the total length matches the sample species
+* That you do not have a high number of contigs (ideally <700)
+* That you do not have low coverage (ideally >30X)
+* A low number og long contigs is preferable to a high number of contigs with short contigs
+
