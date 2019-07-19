@@ -1,4 +1,4 @@
-# AsmPipe
+# Asmbl - Assembly and quality assessment of short-read Illumina data
 
 NOTE: This is still under development, there might be bugs when using nondefault options...
 
