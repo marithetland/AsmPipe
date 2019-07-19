@@ -8,9 +8,6 @@ This script will quality- and adapter-trim your data, create a FastQC report, as
 
 The script creates a report summarising for each sample: Species, ST, no. reads, GC%, no. contigs, largest contig, total sequence length, N50, L50 and sequence depth.
 
-2019-07-18: Added options to not run parts of the pipeline, and added option to run kleborate (https://github.com/katholt/Kleborate) at the end of the pipeline
-
-
 ## Table of Contents
 
 [Requirements](#Requirements)  
@@ -18,6 +15,8 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 [Example Command](#Example-command)  
 [Output](#Output)  
 [Detailed Explanation](#Detailed-explanation)
+[Updates](#Updates)
+
 
 ## Requirements
 These need to be installed for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the I have tested with.
@@ -110,3 +109,6 @@ Things to check QC-wise
 * That you do not have low coverage (ideally >30X)
 * A low number og long contigs is preferable to a high number of contigs with short contigs
 
+## Updates
+2019-07-18: Added options to find \*fastq-gz files in subdirectories from previuos runs
+2019-07-18: Added options to not run parts of the pipeline, and added option to run kleborate (https://github.com/katholt/Kleborate) at the end of the pipeline
