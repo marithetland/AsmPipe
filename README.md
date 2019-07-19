@@ -109,6 +109,8 @@ Things to check QC-wise
 * That you do not have low coverage (ideally >30X)
 * A low number og long contigs is preferable to a high number of contigs with short contigs
 
+
 ## Updates
 2019-07-18: Added options to find \*fastq-gz files in subdirectories from previuos runs
+
 2019-07-18: Added options to not run parts of the pipeline, and added option to run kleborate (https://github.com/katholt/Kleborate) at the end of the pipeline
