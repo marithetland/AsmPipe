@@ -14,9 +14,8 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 [Usage](#Usage)  
 [Example Command](#Example-command)  
 [Output](#Output)  
-[Detailed Explanation](#Detailed-explanation)
-[Updates](#Updates)
-
+[Detailed Explanation](#Detailed-explanation)  
+[Updates](#Updates)  
 
 ## Requirements
 These need to be installed for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the I have tested with.
