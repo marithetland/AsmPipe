@@ -7,11 +7,13 @@ June 2019
 This is an automated pipeline for use in the microbiology lab @SUS
 The script takes as input short-read FASTQ files and:
 1) QC's the samples with FastQC and Quast
-2) Trimmes the samples with TrimGalore
+2) Trims the samples with TrimGalore (cutadapt)
 3) Assembles the samples using Unicycler
 4) Calculates overall coverage/sequence depth
-5) Assesses species and sequence type (ST)
+5) Assesses species and sequence type (ST) using mlst
 6) Produces a QC summary-file
+7) Alternatively also runs Kleborate on klebsiella-species or
+8) Abricate
 '''
 
 #import modules
@@ -30,7 +32,7 @@ from subprocess import call
 #Defs
 def parse_args():
     #Version
-    parser = ArgumentParser(description='AMR-NGS')
+    parser = ArgumentParser(description='ASMBL')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + "v.1.0.0")
     
     parser.add_argument('-t','--threads', type=int, default=4, required=False, help='Specify threads to use. Default: 4')
@@ -40,7 +42,14 @@ def parse_args():
     parser.add_argument('--noquast', action='store_true', required=False, help='Do not run Quast')
     parser.add_argument('--nocov', action='store_true', required=False, help='Do not calculate X')
 
-    parser.add_argument('--klebs', action='store_true', required=False, help='Run Kleborate')
+    parser.add_argument('--klebs', action='store_true', required=False, help='Run Kleborate, with option --all')
+    parser.add_argument('--argannot', action='store_true', required=False, help='Search the ARGannot databse using Abricate')
+    parser.add_argument('--resfinder', action='store_true', required=False, help='Search the RESfinder databse using Abricate')
+    parser.add_argument('--plasmidfinder', action='store_true', required=False, help='Search the PlasmidFinder databse using Abricate')
+    parser.add_argument('--card', action='store_true', required=False, help='Search the CARD databse using Abricate')
+    parser.add_argument('--ncbi', action='store_true', required=False, help='Search the NCBI databse using Abricate')
+    parser.add_argument('--ecoh', action='store_true', required=False, help='Search the ECOH databse using Abricate')
+    parser.add_argument('--abricate_all', action='store_true', required=False, help='Search all the above databases using Abricate')
 
     return parser.parse_args()
 
@@ -111,6 +120,7 @@ def main():
         print('Quast will not be run.')
     if args.nocov:
         print('Coverage will not be calculated.')
+        
     
     if not args.noex and not args.nofqc and not args.nomlst and not args.noquast and not args.nocov and not args.klebs:
         print("Pipeline will be run with: TrimGalore, fastQC, multiQC, Unicycler, Quast, mlst and coverage calculation.")
@@ -118,7 +128,21 @@ def main():
         print("Pipeline will be run with: TrimGalore, fastQC, multiQC, Unicycler, Quast, mlst, coverage calculation and kleborate.")
     else:
         if args.klebs:
-            print('Kleborate will be run on all samples.')
+            print('Kleborate will be run on all samples with option --all.')
+    if args.abricate_all:
+        print('Search of databases using Abricate on all samples will be performed.')
+    if args.argannot:
+        print('Search of ARGannot database using Abricate on all samples will be performed.')
+    if args.resfinder:
+        print('Search of resfinder database using Abricate on all samples will be performed.')
+    if args.plasmidfinder:
+        print('Search of plasmidfinder database using Abricate on all samples will be performed.')
+    if args.card:
+        print('Search of card database using Abricate on all samples will be performed.')
+    if args.ncbi:
+        print('Search of ncbi database using Abricate on all samples will be performed.')
+    if args.ecoh:
+        print('Search of ecoh database using Abricate on all samples will be performed.')
 
     #Set current working directory
     current_dir = os.getcwd()
@@ -132,6 +156,7 @@ def main():
         logging.info('Input files are *.fastq.gz')
         #Rename files if named *_R?_001
         if any(File.endswith(".fastq.gz") for File in os.listdir(current_dir)):
+            run_command(["rename 's/_L001_R1_001/_1/g' ",current_dir,"*R1* && rename 's/_L001_R2_001/_2/g' ",current_dir,"*R2*"], shell=True)
             run_command(["rename 's/_R1_001/_1/g' ",current_dir,"*R1* && rename 's/_R2_001/_2/g' ",current_dir,"*R2*"], shell=True)
         #Add all sequences to sequence_list
         sequences = glob.glob("*fastq.gz")  #Only works for .fastq.gz suffix currently
@@ -174,7 +199,7 @@ def main():
 
         createFolder(current_dir+'trimmed_reads') 
         try:
-            run_command(['mv *val*gz *unpaired*gz *trimming* ./trimmed_reads  2>/dev/null'], shell=True)
+            run_command(['mv *val*gz *unpaired*gz ./trimmed_reads  2>/dev/null'], shell=True)
         except:
             pass
 
@@ -197,7 +222,7 @@ def main():
                 try:
                     run_command(['trim_galore --paired -trim1 --retain_unpaired ',item,'_?.fastq.gz > ',current_dir,'logs/',item,'_trimgalore_',todays_date,'.log 2>&1'], shell=True)
                     logging.info(item+": TrimGalore success.")
-                    run_command(['mv *trimming* *val* *unpaired* ./trimmed_reads 2>/dev/null'], shell=True)
+                    run_command(['mv *val* *unpaired* ./trimmed_reads 2>/dev/null'], shell=True)
                     #TODO:ADD size-check:run_command(['if [ -s "" ] ; then echo "WARNING: Trimmed file is empty, please check." ; fi'], shell=True)
                 except:
                     logging.info(item+": Trimming unsuccessful. Removing from downstream analysis.")
@@ -285,7 +310,8 @@ def main():
         try:
             for files in glob.glob(current_dir + 'assembly/**/*assembly.fasta', recursive=True):
                 filename = os.path.basename(files)
-                copyfile(files, os.path.join(current_dir+'assemblies/',filename))
+                if not os.path.exists(os.path.join(current_dir+'assemblies/', filename)):
+                    copyfile(files, os.path.join(current_dir+'assemblies/',filename))
         except:
             pass
 
@@ -316,10 +342,11 @@ def main():
                 logging.info("Quast unsuccessful.")
         
         #Get species and ST
+        createFolder(current_dir+'analyses')
         if not args.nomlst and not args.noex:
             logging.info('Looking for MLST')
             try:
-                run_command(['cd ',current_dir,'assemblies/ ; mlst *fasta > mlst.tsv ; cd ',current_dir], shell= True)
+                run_command(['cd ',current_dir,'assemblies/ ; mlst *fasta > ',current_dir,'analyses/mlst.tsv ; cd ',current_dir], shell= True)
                 logging.info("Species and MLST identification success")
             except:
                 logging.info("Species and MLST identification failed. Check input-directory. Alternatively, run mlst manually on the terminal in the ./assemblies-directory: 'mlst *fasta >> mlst.tsv '")
@@ -328,7 +355,7 @@ def main():
         if not args.nocov and not args.noex:
             run_list = []
             for seq in sequence_list:
-                if os.path.isfile(current_dir + 'QC/Coverage/'+seq+'_Coverage.Success'):
+                if os.path.isfile(current_dir + 'success/'+seq+'_Coverage.Success'):
                     logging.info(seq+": Coverage has been calculated.")
                 else:
                     run_list.append(seq)
@@ -356,7 +383,7 @@ def main():
                             
                         run_command(["echo -n '",item," \t' >> ",indi_outfile," ; tot_size=$(samtools view -H final_cont.bam | grep -P '^@SQ' | cut -f 3 -d ':' | awk '{sum+=$1} END {print sum}') ; echo $tot_size ; samtools depth final_cont.bam |awk -v var=$tot_size '{sum+=$3; sumsq+=$3*$3} END {print sum/var \"\t\" sqrt(sumsq/var - (sum/var)**2)}' >> ",indi_outfile," ; rm final_cont* dup_m* input* "  ], shell= True)
                         logging.info(item+": Coverage calculation success.")
-                        run_command(['touch ',current_dir,'QC/Coverage/',item,'_Coverage.Success'], shell= True)
+                        run_command(['touch ',current_dir,'success/',item,'_Coverage.Success'], shell= True)
 
                     except:
                         logging.info(item+": Coverage-calculation unsuccessful. Removing from downstream analysis.")
@@ -367,13 +394,39 @@ def main():
             run_command(['cat ',cov_files,' >> ',outfile], shell= True)    
             
         #Run kleborate
-        #ToDO: integrate Kleborate in final report
+        #ToDO: integrate Kleborate and ABRICATE in final report
         if args.klebs:
             try:
-                run_command(['kleborate --all -a ',current_dir,'assemblies/*fasta'], shell= True) 
+                koutfile=(current_dir+'analyses/Kleborate_'+todays_date+'.txt') 
+                run_command(['kleborate --all -a ',current_dir,'assemblies/*fasta -o ',koutfile], shell= True) 
             except:
                 print("Kleborate failed, do you have kleborate in your path?")
                 pass
+
+        if args.abricate_all or args.resfinder or args.argannot or args.card or args.ncbi or args.vfdb or args.ecoh:
+            aboutpath=(current_dir+'analyses/') 
+        if args.resfinder or args.abricate_all:
+            try:
+                for item in uniq_run_list: 
+                    fasta=(current_dir+'assembly/'+item+'_assembly/'+item+'_assembly.fasta')
+                    run_command(['abricate --db=resfinder --minid 90 --mincov 90 ',fasta,' -o ',aboutpath,'Resfinder_',item,'_',todays_date,'.txt'], shell= True) 
+                run_command(['abricate --summary ',aboutpath,'Resfinder*txt >  ',aboutpath,'Resfinder_summary_',todays_date,'.txt'], shell= True) 
+                #bricate --summary --minid --mincov
+            except:
+                print("Abricate failed, do you have abricate in your path?")
+                pass
+        if args.argannot or args.abricate_all:
+            try:
+                for item in uniq_run_list: 
+                    fasta=(current_dir+'assembly/'+item+'_assembly/'+item+'_assembly.fasta')
+                    run_command(['abricate --db=argannot --minid 90 --mincov 90 ',fasta,' -o ',aboutpath,'ARGannot_',item,'_',todays_date,'.txt'], shell= True) 
+                run_command(['abricate --summary ',aboutpath,'ARGannot*txt >  ',aboutpath,'ARGannot_summary_',todays_date,'.txt'], shell= True) 
+                #bricate --summary --minid --mincov
+            except:
+                print("Abricate failed, do you have abricate in your path?")
+                pass
+        ### ADD THE OTHER DATABASES
+
 
         logging.info("Creating lists of successful and unsuccessful sequences, see 'successful_sequences.txt' and 'failed_sequences.txt'.")
         with open("successful_sequences.txt","w") as seq_suc:
@@ -389,7 +442,7 @@ def main():
     
     #need to tweak for options
     #mlst
-    mlst_file = pd.read_csv(current_dir+'assemblies/mlst.tsv', sep='\t', header=None)
+    mlst_file = pd.read_csv(current_dir+'analyses/mlst.tsv', sep='\t', header=None)
     mlst_file.columns = ['Assembly','species','ST','al1','al2','al3','al4','al5','al6','al7']
     mlst_df = mlst_file.replace("_assembly.fasta","", regex=True)
     mlst_df_sub = mlst_df[['Assembly','species','ST']]
@@ -428,7 +481,7 @@ def main():
     #End of file
     total_time = time.time() - start_time
     time_mins = float(total_time) / 60
-    logging.info('AMR-NGS finished in ' + str(time_mins) + ' mins.')
+    logging.info('ASMBL finished in ' + str(time_mins) + ' mins.')
 
 
 if __name__ == '__main__':
