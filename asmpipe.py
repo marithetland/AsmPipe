@@ -49,6 +49,7 @@ def parse_args():
     parser.add_argument('--card', action='store_true', required=False, help='Search the CARD databse using Abricate')
     parser.add_argument('--ncbi', action='store_true', required=False, help='Search the NCBI databse using Abricate')
     parser.add_argument('--ecoh', action='store_true', required=False, help='Search the ECOH databse using Abricate')
+    parser.add_argument('--vfdb', action='store_true', required=False, help='Search the ECOH databse using Abricate')
     parser.add_argument('--abricate_all', action='store_true', required=False, help='Search all the above databases using Abricate')
 
     return parser.parse_args()
@@ -83,6 +84,15 @@ def file_exists(seqlist, program, path, extention):
             re_run.append(seq)
     if re_run:
         return re_run
+
+def run_abricate(current_dir, seqlist, database, aboutpath):
+    #What is the issue here?
+    fasta=(current_dir+'assembly/'+item+'_assembly/'+item+'_assembly.fasta')
+    for seq in seqlist:
+        fasta=(current_dir+'assembly/'+seq+'_assembly/'+seq+'_assembly.fasta')
+        run_command(['abricate --db=', database,' --minid 90 --mincov 90 ',fasta,' -o ',aboutpath,database,'_',seq,'_',todays_date,'.txt'], shell= True) 
+    run_command(['abricate --summary ',aboutpath,database,'*txt >  ',aboutpath,database,'_summary_',todays_date,'.txt'], shell= True) 
+
 ##End defs
 
 def main():
@@ -402,30 +412,18 @@ def main():
             except:
                 print("Kleborate failed, do you have kleborate in your path?")
                 pass
-
-        if args.abricate_all or args.resfinder or args.argannot or args.card or args.ncbi or args.vfdb or args.ecoh:
+        #Run ABRICATE
+        if args.abricate_all or args.resfinder or args.argannot or args.card or args.ncbi or args.vfdb or args.ecoh or args.plasmidfinder:
             aboutpath=(current_dir+'analyses/') 
         if args.resfinder or args.abricate_all:
             try:
-                for item in uniq_run_list: 
-                    fasta=(current_dir+'assembly/'+item+'_assembly/'+item+'_assembly.fasta')
-                    run_command(['abricate --db=resfinder --minid 90 --mincov 90 ',fasta,' -o ',aboutpath,'Resfinder_',item,'_',todays_date,'.txt'], shell= True) 
-                run_command(['abricate --summary ',aboutpath,'Resfinder*txt >  ',aboutpath,'Resfinder_summary_',todays_date,'.txt'], shell= True) 
-                #bricate --summary --minid --mincov
+                run_abricate(current_dir, uniq_run_list, 'resfinder', aboutpath)
             except:
                 print("Abricate failed, do you have abricate in your path?")
                 pass
-        if args.argannot or args.abricate_all:
-            try:
-                for item in uniq_run_list: 
-                    fasta=(current_dir+'assembly/'+item+'_assembly/'+item+'_assembly.fasta')
-                    run_command(['abricate --db=argannot --minid 90 --mincov 90 ',fasta,' -o ',aboutpath,'ARGannot_',item,'_',todays_date,'.txt'], shell= True) 
-                run_command(['abricate --summary ',aboutpath,'ARGannot*txt >  ',aboutpath,'ARGannot_summary_',todays_date,'.txt'], shell= True) 
-                #bricate --summary --minid --mincov
-            except:
-                print("Abricate failed, do you have abricate in your path?")
-                pass
-        ### ADD THE OTHER DATABASES
+
+        #if args.argannot or args.abricate_all:
+           
 
 
         logging.info("Creating lists of successful and unsuccessful sequences, see 'successful_sequences.txt' and 'failed_sequences.txt'.")
