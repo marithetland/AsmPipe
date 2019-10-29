@@ -1,6 +1,7 @@
-# AsmPipe
+# Asmbl
+**Assembly and quality assessment of short-read Illumina data**
 
-NOTE: This is still under development, there might be bugs...
+NOTE: This is still under development, there might be bugs when using nondefault options...
 
 Pipeline of tools used for quality assessment, assembly and gene detection from short-read Illumina sequences. Created for easy use at our microbiology research lab at Stavanger University Hopsital.
 
@@ -8,45 +9,57 @@ This script will quality- and adapter-trim your data, create a FastQC report, as
 
 The script creates a report summarising for each sample: Species, ST, no. reads, GC%, no. contigs, largest contig, total sequence length, N50, L50 and sequence depth.
 
-2019-07-18: Added options to not run parts of the pipeline, and added option to run kleborate (https://github.com/katholt/Kleborate) at the end of the pipeline
-
-
 ## Table of Contents
 
 [Requirements](#Requirements)  
+[Basic Usage](#Basic-usage)  
 [Usage](#Usage)  
-[ExampleCommand](#Example-command)  
 [Output](#Output)  
+[Detailed Explanation](#Detailed-explanation)  
+[Updates](#Updates)  
 
 ## Requirements
+These need to be installed for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the I have tested with.
 
 * Linux or MacOS
 * Python 3.5.0+
-* FastQC
-* TrimGalore
-* SPAdes
-* Unicycler
-* Quast
-* mlst
-* kleborate
-* BWA
-* SAMtools
-* PicardTools
+* FastQC v0.11.7 (https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
+* MultiQC v1.7 (https://multiqc.info/)
+* TrimGalore v0.5.0 (https://www.bioinformatics.babraham.ac.uk/projects/trim_galore/)
+* SPAdes v3.13.0 (http://cab.spbu.ru/software/spades/)
+* Pilon v1.22 (https://www.broadinstitute.org/gaag/pilon)
+* Unicycler v0.4.4 (https://github.com/rrwick/Unicycler)
+* Quast v4.6.3 (http://quast.sourceforge.net/quast)
+* mlst v2.16.2 (https://github.com/tseemann/mlst)
+* BWA v0.7.17-r1188 (http://bio-bwa.sourceforge.net/)
+* SAMtools v1.7 (http://www.htslib.org/download/)
+* PicardTools v2.17.8-SNAPSHOT (https://broadinstitute.github.io/picard/)
+* Optional: Kleborate v0.3.0 (https://github.com/katholt/Kleborate)
+* Optional: Abricate v0.8 (https://github.com/tseemann/abricate)
+
+## Basic usage
+
+You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory.
+
+``` 
+cd ~/Directory_with_fastq/ #Enter directory with FASTQ-files
+asmbl.py 
+```
 
 ## Usage
 
-You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory.
+You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. In addition to the default pipeline, you can also run kleborate or abricate.
 
 Usage:
 
 ```
-AMR-NGS
+ASMBL [-h] [-v] [-t THREADS] [--noex] [--nofqc] [--nomlst]
+               [--noquast] [--nocov] [--klebs] [--argannot] [--resfinder]
+               [--plasmidfinder] [--card] [--ncbi] [--ecoh] [--abricate_all]
 
-usage: asmpipe.py [-h] [-v] [-t THREADS] [--noex] [--nofqc] [--nomlst]
-                  [--noquast] [--nocov] [--klebs]
+ASMBL
 
-
-Optional arguments:
+optional arguments:
   -h, --help            show this help message and exit
   -v, --version         show program's version number and exit
   -t THREADS, --threads THREADS
@@ -56,8 +69,16 @@ Optional arguments:
   --nofqc               Do not run fastQC and multiQC
   --nomlst              Do not run MLST
   --noquast             Do not run Quast
-  --nocov               Do not calculate X 
-  --klebs               Run Kleborate
+  --nocov               Do not calculate X
+  --klebs               Run Kleborate, with option --all
+  --argannot            Search the ARGannot databse using Abricate
+  --resfinder           Search the RESfinder databse using Abricate
+  --plasmidfinder       Search the PlasmidFinder databse using Abricate
+  --card                Search the CARD databse using Abricate
+  --ncbi                Search the NCBI databse using Abricate
+  --ecoh                Search the ECOH databse using Abricate
+  --abricate_all        Search all the above databases using Abricate
+
 
 ```
 
@@ -65,13 +86,6 @@ You can add more FASTQ-files to the same output-directories/summary-report, by a
 
 Note: This was initially created for scientist with little/no coding-experience to easily perform assembly, therefore, this script currently only works when you run it from the folder the FASTQ-files are in, and output-files are stored in the same directory. In the future, I will add input and output-options.
  
-
-## Example command
-
-``` 
-cd ~/Directory_with_fastq/ #Enter directory with FASTQ-files
-asmpipe.py #Run pipeline
-```
 
 ## Output
 
@@ -82,8 +96,34 @@ The following output-files are created when running AsmPipe:
 * assembly: The Unicycler-assembled files will be placed here
 * assemblies: The FASTA-file from assembly will be copied to this direcory
 * QC: Contains reports from FastQC, multiQC, Quast, trimming and overall coverage calculation
+* analyses: Contains results from mlst, kleborate and abricate
 * sequence_list.txt: List of all samples that have been analysed
 * successful_sequences.txt: List of all samples that were successfully assembled
 * failed_sequences.txt: List of any samples that failed any stage of the pipeline
 * logs: Will contain run-logs from each tool for each sample
 * AsmPipe_date_time.csv: Overall summary report of: Species, ST, no. reads, GC%, no. contigs, largest contig, total sequence length, N50, L50 and sequence depth.
+
+
+## Detailed explanation
+
+* FastQC performs quality assessment of raw reads, indicating number of reads, GC%, adapter content, sequence length distribution, and more
+* TrimGalore - trims raw reads based on adapter sequences and Phred quality: trims 1 bp off 3' end of every read, removes low-quality (<Phred 20) 3' ends, removes adapter sequences and removes read-pairs if either of the reads' length is <20 bp
+* Unicycler functions as a SPAdes optimiser with short-reads only, and pilon polishing attempts to make imporvements on the genome
+* Quast quality assessment on assembly outputs the total length, GC%, number of contigs, N50, L50 and more. 
+* MLST attempts to identify species and mlst based on the PubMLST schemes. Other tools may be needed for specification, e.g. Kleborate identifies locus variants for Klebsiella samples and separates klebsiella pneumoniae sensu lato into subspecies
+* Sequencing depth (X) - maps the reads against their assembled fasta-file to calculate the overall average depth of the genome.
+
+Things to check QC-wise
+* That GC% matches the sample species
+* That the total length matches the sample species
+* That you do not have a high number of contigs (ideally <700)
+* That you do not have low coverage (ideally >30X)
+* A low number og long contigs is preferable to a high number of contigs with short contigs
+
+
+## Updates
+2019-07-18: Added options to find \*fastq-gz files in subdirectories from previuos runs
+
+2019-07-18: Added options to not run parts of the pipeline, and added option to run kleborate (https://github.com/katholt/Kleborate) at the end of the pipeline
+
+2019-10-29 : Added options to run ABRICATE as part of the pipeline, and created output-folder "analyses" to put mlst, kleborate and ABRICATE-outputs in. Also added merge_runs.sh which you can use to merge two parent folders with the same structure (from this script). 
