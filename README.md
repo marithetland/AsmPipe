@@ -12,7 +12,7 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 ## Table of Contents
 
 [Requirements](#Requirements)  
-[Basic Usage](#Basic-usage)
+[Basic Usage](#Basic-usage) 
 [Usage](#Usage)  
 [Output](#Output)  
 [Detailed Explanation](#Detailed-explanation)  
