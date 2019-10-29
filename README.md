@@ -35,22 +35,31 @@ These need to be installed for the entire pipeline to work. Other versions of th
 * SAMtools v1.7 (http://www.htslib.org/download/)
 * PicardTools v2.17.8-SNAPSHOT (https://broadinstitute.github.io/picard/)
 * Optional: Kleborate v0.3.0 (https://github.com/katholt/Kleborate)
+* Optional: Abricate v0.8 (https://github.com/tseemann/abricate)
 
-
-## Usage
+## Basic usage
 
 You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory.
+
+``` 
+cd ~/Directory_with_fastq/ #Enter directory with FASTQ-files
+asmbl.py 
+```
+
+## All usage
+
+You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. In addition to the default pipeline, you can also run kleborate or abricate.
 
 Usage:
 
 ```
-AMR-NGS
+ASMBL [-h] [-v] [-t THREADS] [--noex] [--nofqc] [--nomlst]
+               [--noquast] [--nocov] [--klebs] [--argannot] [--resfinder]
+               [--plasmidfinder] [--card] [--ncbi] [--ecoh] [--abricate_all]
 
-usage: asmpipe.py [-h] [-v] [-t THREADS] [--noex] [--nofqc] [--nomlst]
-                  [--noquast] [--nocov] [--klebs]
+ASMBL
 
-
-Optional arguments:
+optional arguments:
   -h, --help            show this help message and exit
   -v, --version         show program's version number and exit
   -t THREADS, --threads THREADS
@@ -60,8 +69,16 @@ Optional arguments:
   --nofqc               Do not run fastQC and multiQC
   --nomlst              Do not run MLST
   --noquast             Do not run Quast
-  --nocov               Do not calculate X 
-  --klebs               Run Kleborate
+  --nocov               Do not calculate X
+  --klebs               Run Kleborate, with option --all
+  --argannot            Search the ARGannot databse using Abricate
+  --resfinder           Search the RESfinder databse using Abricate
+  --plasmidfinder       Search the PlasmidFinder databse using Abricate
+  --card                Search the CARD databse using Abricate
+  --ncbi                Search the NCBI databse using Abricate
+  --ecoh                Search the ECOH databse using Abricate
+  --abricate_all        Search all the above databases using Abricate
+
 
 ```
 
@@ -69,13 +86,6 @@ You can add more FASTQ-files to the same output-directories/summary-report, by a
 
 Note: This was initially created for scientist with little/no coding-experience to easily perform assembly, therefore, this script currently only works when you run it from the folder the FASTQ-files are in, and output-files are stored in the same directory. In the future, I will add input and output-options.
  
-
-## Example command
-
-``` 
-cd ~/Directory_with_fastq/ #Enter directory with FASTQ-files
-asmpipe.py #Run pipeline
-```
 
 ## Output
 
@@ -86,6 +96,7 @@ The following output-files are created when running AsmPipe:
 * assembly: The Unicycler-assembled files will be placed here
 * assemblies: The FASTA-file from assembly will be copied to this direcory
 * QC: Contains reports from FastQC, multiQC, Quast, trimming and overall coverage calculation
+* analyses: Contains results from mlst, kleborate and abricate
 * sequence_list.txt: List of all samples that have been analysed
 * successful_sequences.txt: List of all samples that were successfully assembled
 * failed_sequences.txt: List of any samples that failed any stage of the pipeline
@@ -114,3 +125,5 @@ Things to check QC-wise
 2019-07-18: Added options to find \*fastq-gz files in subdirectories from previuos runs
 
 2019-07-18: Added options to not run parts of the pipeline, and added option to run kleborate (https://github.com/katholt/Kleborate) at the end of the pipeline
+
+2019-10-29 : Added options to run ABRICATE as part of the pipeline, and created output-folder "analyses" to put mlst, kleborate and ABRICATE-outputs in. Also added merge_runs.sh which you can use to merge two parent folders with the same structure (from this script). 
