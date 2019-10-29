@@ -1,8 +1,6 @@
 # Asmbl
 **Assembly and quality assessment of short-read Illumina data**
 
-NOTE: This is still under development, there might be bugs when using nondefault options...
-
 Pipeline of tools used for quality assessment, assembly and gene detection from short-read Illumina sequences. Created for easy use at our microbiology research lab at Stavanger University Hopsital.
 
 This script will quality- and adapter-trim your data, create a FastQC report, assemble the trimmed FASTQ-reads using UniCycler, create a Quast QC-report, run mlst to identify sequence types and species, and will also calculate overall coverage (sequence depth) of each sample.
