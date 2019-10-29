@@ -12,8 +12,8 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 ## Table of Contents
 
 [Requirements](#Requirements)  
+[Basic Usage](#Basic-usage)
 [Usage](#Usage)  
-[Example Command](#Example-command)  
 [Output](#Output)  
 [Detailed Explanation](#Detailed-explanation)  
 [Updates](#Updates)  
@@ -46,7 +46,7 @@ cd ~/Directory_with_fastq/ #Enter directory with FASTQ-files
 asmbl.py 
 ```
 
-## All usage
+## Usage
 
 You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. In addition to the default pipeline, you can also run kleborate or abricate.
 
