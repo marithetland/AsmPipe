@@ -17,7 +17,7 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 [Updates](#Updates)  
 
 ## Requirements
-These need to be installed for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the I have tested with.
+These need to be installed and in path for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the I have tested with.
 
 * Linux or MacOS
 * Python 3.5.0+
