@@ -401,7 +401,7 @@ def main():
                         unsuccessful_sequences.append(item)
             outfile=(current_dir+'QC/Coverage/overall_coverage.tsv') 
             cov_files=(current_dir+'QC/Coverage/*_X.tsv') 
-            run_command(['cat ',cov_files,' >> ',outfile], shell= True)    
+            run_command(['cat ',cov_files,' > ',outfile], shell= True)    
             
         #Run kleborate
         #ToDO: integrate Kleborate and ABRICATE in final report
@@ -440,8 +440,7 @@ def main():
     
     #need to tweak for options
     #mlst
-    mlst_file = pd.read_csv(current_dir+'analyses/mlst.tsv', sep='\t', header=None)
-    mlst_file.columns = ['Assembly','species','ST','al1','al2','al3','al4','al5','al6','al7']
+    mlst_file = pd.read_csv('analyses/mlst.tsv', sep='\t', header=None, names=list(['Assembly','species', 'ST', 'al1','al2','al3','al4','al5','al6','al7']))
     mlst_df = mlst_file.replace("_assembly.fasta","", regex=True)
     mlst_df_sub = mlst_df[['Assembly','species','ST']]
     seq_df_mlst = pd.merge(seq_df, mlst_df_sub, on='Assembly', how='outer')
