@@ -21,19 +21,19 @@ These need to be installed and in path for the entire pipeline to work. Other ve
 
 * Linux or MacOS
 * Python 3.5.0+
-* FastQC v0.11.7 (https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
+* FastQC v0.11.8 (https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
 * MultiQC v1.7 (https://multiqc.info/)
-* TrimGalore v0.5.0 (https://www.bioinformatics.babraham.ac.uk/projects/trim_galore/)
-* SPAdes v3.13.0 (http://cab.spbu.ru/software/spades/)
-* Pilon v1.22 (https://www.broadinstitute.org/gaag/pilon)
-* Unicycler v0.4.4 (https://github.com/rrwick/Unicycler)
+* TrimGalore v0.6.4 (https://www.bioinformatics.babraham.ac.uk/projects/trim_galore/)
+* SPAdes v3.13.1 (http://cab.spbu.ru/software/spades/)
+* Pilon v1.23 (https://www.broadinstitute.org/gaag/pilon)
+* Unicycler v0.4.8 (https://github.com/rrwick/Unicycler)
 * Quast v4.6.3 (http://quast.sourceforge.net/quast)
-* mlst v2.16.2 (https://github.com/tseemann/mlst)
+* mlst v2.16.3 (https://github.com/tseemann/mlst)
 * BWA v0.7.17-r1188 (http://bio-bwa.sourceforge.net/)
-* SAMtools v1.7 (http://www.htslib.org/download/)
-* PicardTools v2.17.8-SNAPSHOT (https://broadinstitute.github.io/picard/)
-* Optional: Kleborate v0.3.0 (https://github.com/katholt/Kleborate)
-* Optional: Abricate v0.8 (https://github.com/tseemann/abricate)
+* SAMtools v1.9 (http://www.htslib.org/download/)
+* PicardTools v2.21.4-SNAPSHOT (https://broadinstitute.github.io/picard/)
+* Optional: Kleborate v0.4.0-beta (https://github.com/katholt/Kleborate)
+* Optional: Abricate v0.8.10 (https://github.com/tseemann/abricate)
 
 ## Basic usage
 
@@ -124,4 +124,6 @@ Things to check QC-wise
 
 2019-07-18: Added options to not run parts of the pipeline, and added option to run kleborate (https://github.com/katholt/Kleborate) at the end of the pipeline
 
-2019-10-29 : Added options to run ABRICATE as part of the pipeline, and created output-folder "analyses" to put mlst, kleborate and ABRICATE-outputs in. Also added merge_runs.sh which you can use to merge two parent folders with the same structure (from this script). 
+2019-10-29: Added options to run ABRICATE as part of the pipeline, and created output-folder "analyses" to put mlst, kleborate and ABRICATE-outputs in. Also added merge_runs.sh which you can use to merge two parent folders with the same structure (from this script). 
+
+2019-10-30: Updated tool versions in README
