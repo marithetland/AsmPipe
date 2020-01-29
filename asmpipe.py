@@ -228,18 +228,21 @@ def main():
         if run_list:
             logging.info("Running TrimGalore")
             uniq_run_list = set(run_list)
-            for item in uniq_run_list: 
-                try:
-                    run_command(['trim_galore --paired -trim1 --retain_unpaired ',item,'_?.fastq.gz > ',current_dir,'logs/',item,'_trimgalore_',todays_date,'.log 2>&1'], shell=True)
-                    logging.info(item+": TrimGalore success.")
-                    run_command(['mv *val* *unpaired* ./trimmed_reads 2>/dev/null'], shell=True)
-                    #TODO:ADD size-check:run_command(['if [ -s "" ] ; then echo "WARNING: Trimmed file is empty, please check." ; fi'], shell=True)
-                except:
-                    logging.info(item+": Trimming unsuccessful. Removing from downstream analysis.")
-                    for file in glob.glob(item+'*_fq.gz'):
-                        os.remove(file)
-                    sequence_list.remove(item)
-                    unsuccessful_sequences.append(item)
+            with open('uniq_trimgalore_list.txt', 'w') as w:
+                for item in uniq_run_list:
+                    w.write("%s\n" % item)
+            try:
+                run_command(["parallel --jobs ",threads," 'echo {} ; trim_galore --paired -trim1 {}_1.fastq.gz {}_2.fastq.gz >> ./logs/{}_trimgalore.log 2>&1' ::: $(cat ",current_dir,"uniq_trimgalore_list.txt) ; cd ",current_dir ], shell=True)
+                logging.info(item+": TrimGalore success.")
+                run_command(['mv *val* ./trimmed_reads 2>/dev/null'], shell=True)
+                #TODO:ADD size-check:run_command(['if [ -s "" ] ; then echo "WARNING: Trimmed file is empty, please check." ; fi'], shell=True)
+            except:
+                logging.info(item+": Trimming unsuccessful. Removing from downstream analysis.")
+                for file in glob.glob(item+'*_fq.gz'):
+                    os.remove(file)
+                sequence_list.remove(item)
+                unsuccessful_sequences.append(item)
+
 
         #Run FastQC and multiQC
         if not args.nofqc and not args.noex:
@@ -265,7 +268,8 @@ def main():
                 except:
                     logging.info(item+": FastQC unsuccessful. ")
                     unsuccessful_sequences.append(item)
-                
+                #ToDo: Add parallel runs of fastqc
+    
             
             #Run multiqc (will run regardless of previous versions)
             logging.info('Running MultiQC.')
@@ -300,8 +304,8 @@ def main():
                 for item in uniq_run_list:
                     f.write("%s\n" % item)
             try:
-                run_command(["cd ",trimmed_dir," ; parallel --jobs ",threads," 'echo {} ; unicycler -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
-                     -o ../assembly/{}_assembly --verbosity 2 --keep 2 ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; cd ",current_dir], shell=True)
+                run_command(["source activate unicycler ; cd ",trimmed_dir," ; parallel --jobs ",threads," 'echo {} ; unicycler -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
+                     -o ../assembly/{}_assembly --pilon_path /home/marit/anaconda3/pkgs/pilon-1.23-2/share/pilon-1.23-2/pilon-1.23.jar --verbosity 2 --keep 2 ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; source deactivate unicycler ; cd ",current_dir], shell=True)
             except:
                 logging.info(": Assembly unsuccessful.") # Removing from downstream analysis.")
 
@@ -383,13 +387,14 @@ def main():
                         trim_2=(current_dir+'trimmed_reads/'+item+'_2_val_2.fq.gz')
                         indi_outfile=(current_dir+'QC/Coverage/'+item+'_X.tsv') 
                         outfile=(current_dir+'QC/Coverage/overall_coverage.tsv') 
+                        picard=("/home/marit/Programs/java/jre1.8.0_231/bin/java -jar /home/marit/anaconda3/pkgs/picard-2.21.4-0/share/picard-2.21.4-0/picard.jar")
                         run_command(['bwa index ', fasta], shell= True)
                         
                         run_command(['bwa mem -t 8 ',fasta,' ',trim_1,' ',trim_2,' > input_c.sam  ; \
-                            picard SamFormatConverter INPUT=input_c.sam VALIDATION_STRINGENCY=SILENT OUTPUT=input_c.bam ; \
-                            picard SortSam INPUT=input_c.bam OUTPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT SORT_ORDER=coordinate ; \
-                            picard MarkDuplicates INPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam METRICS_FILE=dup_metrics ; \
-                            picard BuildBamIndex INPUT=final_cont.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam.bai ' ], shell= True)
+                            ',picard,' SamFormatConverter INPUT=input_c.sam VALIDATION_STRINGENCY=SILENT OUTPUT=input_c.bam ; \
+                            ',picard,' SortSam INPUT=input_c.bam OUTPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT SORT_ORDER=coordinate ; \
+                            ',picard,' MarkDuplicates INPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam METRICS_FILE=dup_metrics ; \
+                            ',picard,' BuildBamIndex INPUT=final_cont.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam.bai ' ], shell= True)
                             
                         run_command(["echo -n '",item," \t' >> ",indi_outfile," ; tot_size=$(samtools view -H final_cont.bam | grep -P '^@SQ' | cut -f 3 -d ':' | awk '{sum+=$1} END {print sum}') ; echo $tot_size ; samtools depth final_cont.bam |awk -v var=$tot_size '{sum+=$3; sumsq+=$3*$3} END {print sum/var \"\t\" sqrt(sumsq/var - (sum/var)**2)}' >> ",indi_outfile," ; rm final_cont* dup_m* input* "  ], shell= True)
                         logging.info(item+": Coverage calculation success.")
