@@ -260,10 +260,17 @@ def main():
             if fastqc_R2:
                 for item in fastqc_R2:
                     run_list.append(item + ("_2_val_2.fq.gz"))
-            logging.info("Running FastQC on trimmed files")
-            for item in run_list: 
+            if run_list:
+                logging.info("Running FastQC on trimmed files")
+                uniq_run_list = set(run_list)
+                with open('uniq_fastqc_list.txt', 'w') as w:
+                    for item in uniq_run_list:
+                        w.write("%s\n" % item)
+            #for item in run_list: 
                 try:
-                    run_command(['fastqc ',current_dir,'trimmed_reads/', item, ' -o QC/fastQC > ',current_dir,'logs/',item,'_fastqc_trimmed_',todays_date,'.log 2>&1' ], shell=True)
+                    #run_command(['fastqc ',current_dir,'trimmed_reads/', item, ' -o QC/fastQC > ',current_dir,'logs/',item,'_fastqc_trimmed_',todays_date,'.log 2>&1' ], shell=True)
+                    run_command(["parallel --jobs ",threads," 'echo {} ; fastqc ./trimmed_reads/{} -o QC/fastQC >> ./logs/{}_fastqc_trimmed.log 2>&1' ::: $(cat ",current_dir,"uniq_fastqc_list.txt) ; cd ",current_dir ], shell=True)
+
                     logging.info(item+": FastQC success. ")
                 except:
                     logging.info(item+": FastQC unsuccessful. ")
