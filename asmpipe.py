@@ -118,7 +118,12 @@ def main():
         threads=str(4)
     else:
         threads=str(args.threads)
+    if int(threads) > 8 :
+        unic_threads=(str(int(int(threads)/8)))
+    else:
+        unic_threads=threads
     print('Using '+ str(threads) + ' threads')
+    print('Using '+ str(unic_threads + ' threads for unicycler x8 threads assembly'))
 
     if args.noex:
         print('Trimming and assembling reads only, no QC or downstream analyses.')
@@ -269,7 +274,7 @@ def main():
             #for item in run_list: 
                 try:
                     #run_command(['fastqc ',current_dir,'trimmed_reads/', item, ' -o QC/fastQC > ',current_dir,'logs/',item,'_fastqc_trimmed_',todays_date,'.log 2>&1' ], shell=True)
-                    run_command(["parallel --jobs ",threads," 'echo {} ; fastqc ./trimmed_reads/{} -o QC/fastQC >> ./logs/{}_fastqc_trimmed.log 2>&1' ::: $(cat ",current_dir,"uniq_fastqc_list.txt) ; cd ",current_dir ], shell=True)
+                    run_command(["parallel --jobs ",unic_threads," 'echo {} ; fastqc ./trimmed_reads/{} -o QC/fastQC >> ./logs/{}_fastqc_trimmed.log 2>&1' ::: $(cat ",current_dir,"uniq_fastqc_list.txt) ; cd ",current_dir ], shell=True)
 
                     logging.info(item+": FastQC success. ")
                 except:
@@ -312,7 +317,7 @@ def main():
                     f.write("%s\n" % item)
             try:
                 run_command(["source activate unicycler ; cd ",trimmed_dir," ; parallel --jobs ",threads," 'echo {} ; unicycler -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
-                     -o ../assembly/{}_assembly --pilon_path /home/marit/anaconda3/pkgs/pilon-1.23-2/share/pilon-1.23-2/pilon-1.23.jar --verbosity 2 --keep 2 ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; source deactivate unicycler ; cd ",current_dir], shell=True)
+                     -o ../assembly/{}_assembly --pilon_path /opt/anaconda/anaconda3/pkgs/pilon-1.23-2/share/pilon-1.23-2/pilon-1.23.jar --verbosity 2 --keep 2 ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; source deactivate unicycler ; cd ",current_dir], shell=True)
             except:
                 logging.info(": Assembly unsuccessful.") # Removing from downstream analysis.")
 
@@ -381,11 +386,14 @@ def main():
                 else:
                     run_list.append(seq)
                     logging.info(seq+": Coverage has not been calculated.")
-            
+
             if run_list:
                 createFolder(current_dir+'QC/Coverage') 
                 logging.info("Calculating average coverage of each sample")
                 uniq_run_list = set(run_list)
+                # with open('uniq_coverage_list.txt', 'w') as w:
+                #     for item in uniq_run_list:
+                #         w.write("%s\n" % item)
                 for item in uniq_run_list: 
                     logging.info(item)
                     try:
@@ -394,16 +402,15 @@ def main():
                         trim_2=(current_dir+'trimmed_reads/'+item+'_2_val_2.fq.gz')
                         indi_outfile=(current_dir+'QC/Coverage/'+item+'_X.tsv') 
                         outfile=(current_dir+'QC/Coverage/overall_coverage.tsv') 
-                        picard=("/home/marit/Programs/java/jre1.8.0_231/bin/java -jar /home/marit/anaconda3/pkgs/picard-2.21.4-0/share/picard-2.21.4-0/picard.jar")
                         run_command(['bwa index ', fasta], shell= True)
                         
                         run_command(['bwa mem -t 8 ',fasta,' ',trim_1,' ',trim_2,' > input_c.sam  ; \
-                            ',picard,' SamFormatConverter INPUT=input_c.sam VALIDATION_STRINGENCY=SILENT OUTPUT=input_c.bam ; \
-                            ',picard,' SortSam INPUT=input_c.bam OUTPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT SORT_ORDER=coordinate ; \
-                            ',picard,' MarkDuplicates INPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam METRICS_FILE=dup_metrics ; \
-                            ',picard,' BuildBamIndex INPUT=final_cont.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam.bai ' ], shell= True)
+                            picard SamFormatConverter INPUT=input_c.sam VALIDATION_STRINGENCY=SILENT OUTPUT=input_c.bam ; \
+                            picard SortSam INPUT=input_c.bam OUTPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT SORT_ORDER=coordinate ; \
+                            picard MarkDuplicates INPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam METRICS_FILE=dup_metrics ; \
+                            picard BuildBamIndex INPUT=final_cont.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam.bai ' ], shell= True)
                             
-                        run_command(["echo -n '",item," \t' >> ",indi_outfile," ; tot_size=$(samtools view -H final_cont.bam | grep -P '^@SQ' | cut -f 3 -d ':' | awk '{sum+=$1} END {print sum}') ; echo $tot_size ; samtools depth final_cont.bam |awk -v var=$tot_size '{sum+=$3; sumsq+=$3*$3} END {print sum/var \"\t\" sqrt(sumsq/var - (sum/var)**2)}' >> ",indi_outfile," ; rm final_cont* dup_m* input* "  ], shell= True)
+                        run_command(["echo -n '",item," \t' >> ",indi_outfile," ; tot_size=$(samtools view -H final_cont.bam | grep -P '^@SQ' | cut -f 3 -d ':' | awk '{sum+=$1} END {print sum}') ; echo $tot_size ; samtools depth final_cont.bam |awk -v var=$tot_size '{sum+=$3; sumsq+=$3*$3} END {print sum/var \"\t\" sqrt(sumsq/var - (sum/var)*2)}' >> ",indi_outfile," ; rm final_cont* dup_m* input* "  ], shell= True)
                         logging.info(item+": Coverage calculation success.")
                         run_command(['touch ',current_dir,'success/',item,'_Coverage.Success'], shell= True)
 
