@@ -17,7 +17,7 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 [Updates](#Updates)  
 
 ## Requirements
-These need to be installed and in path for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the I have tested with.
+These need to be installed and in path for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the ones I have tested.
 
 * Linux or MacOS
 * Python 3.5.0+
@@ -118,6 +118,8 @@ Things to check QC-wise
 * That you do not have low coverage (ideally >30X)
 * A low number og long contigs is preferable to a high number of contigs with short contigs
 
+## License
+[GNU General Public License, v3](https://www.gnu.org/licenses/gpl-3.0.html)
 
 ## Updates
 2019-07-18: Added options to find \*fastq-gz files in subdirectories from previuos runs
@@ -127,3 +129,4 @@ Things to check QC-wise
 2019-10-29: Added options to run ABRICATE as part of the pipeline, and created output-folder "analyses" to put mlst, kleborate and ABRICATE-outputs in. Also added merge_runs.sh which you can use to merge two parent folders with the same structure (from this script). 
 
 2019-10-30: Updated tool versions in README
+
