@@ -33,7 +33,7 @@ from subprocess import call
 def parse_args():
     #Version
     parser = ArgumentParser(description='ASMBL')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + "v.1.0.0")
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + "v.0.1.0")
     
     parser.add_argument('-t','--threads', type=int, default=4, required=False, help='Specify threads to use. Default: 4')
     parser.add_argument('--noex', action='store_true', required=False, help='Do not run fastQC, multiQC, Quast, MLST or Coverage calculation.')
