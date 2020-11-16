@@ -41,6 +41,7 @@ def parse_args():
     parser.add_argument('--nomlst', action='store_true', required=False, help='Do not run MLST')
     parser.add_argument('--noquast', action='store_true', required=False, help='Do not run Quast')
     parser.add_argument('--nocov', action='store_true', required=False, help='Do not calculate X')
+    parser.add_argument('--pilon_path', action='store_true', required=False, help='Specify pilon path. Default: /opt/anaconda/anaconda3/envs/klebgap_assembly/share/pilon-1.22-1/pilon-1.22.jar')
 
     parser.add_argument('--klebs', action='store_true', required=False, help='Run Kleborate, with option --all')
     parser.add_argument('--argannot', action='store_true', required=False, help='Search the ARGannot databse using Abricate')
@@ -93,14 +94,69 @@ def run_abricate(current_dir, seqlist, database, aboutpath):
         run_command(['abricate --db=', database,' --minid 90 --mincov 90 ',fasta,' -o ',aboutpath,database,'_',seq,'_',todays_date,'.txt'], shell= True) 
     run_command(['abricate --summary ',aboutpath,database,'*txt >  ',aboutpath,database,'_summary_',todays_date,'.txt'], shell= True) 
 
+#Check versions
+def check_unicycler_version(version_output):
+    run_command(['unicycler --version >> versions_',version_output], shell=True)
+    pass
+
+def check_spades_version(version_output):
+    run_command(['spades.py --version >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_trimgalore_version(version_output):
+    run_command(['trimgalversion=$(trim_galore --version | grep version | tr -d " " | sed "s/^/trim_galore\t/g" ) ; echo $trimgalversion >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_pilon_version(version_output):
+    run_command([pilon_path,' >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_fastqc_version(version_output):
+    run_command(['fastqc --version >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_multiqc_version(version_output):
+    run_command(['multiqc --version >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_mlst_version(version_output):
+    run_command(['mlst --version >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_quast_version(version_output):
+    run_command(['quast.py --version >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_bwa_version(version_output):
+    run_command(['bwa 2>&1 | grep Version | sed "s/^/bwa\t/g" >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_samtools_version(version_output):
+    run_command(['samtools --version | grep samtools >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_samtools_version(version_output):
+    run_command(['picard 2>&1 SamFormatConverter --version | sed "s/^/picard\t/g" >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_abricate_version(version_output):
+    run_command(['abricate --version >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+def check_kleborate_version(version_output):
+    run_command(['kleborate --version >> versions_',version_output], shell=True)     ##Check for empty results, skip
+    pass
+
+##To do: In future, add versions to final assembly stats file.
+
 ##End defs
 
 def main():
-    
     start_time = time.time()
     args = parse_args()
     now = datetime.datetime.now()    
     todays_date = now.strftime('%Y-%m-%d_%H-%M-%S')
+    version_output=todays_date
     
     # Set up log to stdout
     logfile= None
@@ -135,8 +191,14 @@ def main():
         print('Quast will not be run.')
     if args.nocov:
         print('Coverage will not be calculated.')
-        
+    #pilon_path
+    if args.pilon_path:
+        pilon_path=args.pilon_path
+    else:
+        pilon_path="/opt/anaconda/anaconda3/envs/klebgap_assembly/share/pilon-1.22-1/pilon-1.22.jar"
+
     
+
     if not args.noex and not args.nofqc and not args.nomlst and not args.noquast and not args.nocov and not args.klebs:
         print("Pipeline will be run with: TrimGalore, fastQC, multiQC, Unicycler, Quast, mlst and coverage calculation.")
     if not args.noex and not args.nofqc and not args.nomlst and not args.noquast and not args.nocov and args.klebs:
@@ -232,6 +294,7 @@ def main():
                 
         if run_list:
             logging.info("Running TrimGalore")
+            check_trimgalore_version(version_output)
             uniq_run_list = set(run_list)
             with open('uniq_trimgalore_list.txt', 'w') as w:
                 for item in uniq_run_list:
@@ -267,6 +330,8 @@ def main():
                     run_list.append(item + ("_2_val_2.fq.gz"))
             if run_list:
                 logging.info("Running FastQC on trimmed files")
+                check_fastqc_version(version_output)
+                check_multiqc_version(version_output)
                 uniq_run_list = set(run_list)
                 with open('uniq_fastqc_list.txt', 'w') as w:
                     for item in uniq_run_list:
@@ -311,13 +376,17 @@ def main():
         
         if run_list:
             logging.info("Running Unicycler assembly on unassembled files")
+            check_unicycler_version(version_output)
+            check_spades_version(version_output)
+            check_pilon_version(version_output)
+            check_samtools_version(version_output)
             uniq_run_list = set(run_list)
             with open('uniq_run_list_as.txt', 'w') as f:
                 for item in uniq_run_list:
                     f.write("%s\n" % item)
             try:
                 run_command(["source activate unicycler ; cd ",trimmed_dir," ; parallel --jobs ",threads," 'echo {} ; unicycler -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
-                     -o ../assembly/{}_assembly --pilon_path /opt/anaconda/anaconda3/pkgs/pilon-1.23-2/share/pilon-1.23-2/pilon-1.23.jar --verbosity 2 --keep 2 ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; source deactivate unicycler ; cd ",current_dir], shell=True)
+                     -o ../assembly/{}_assembly --pilon_path ",pilon_path," --verbosity 2 --keep 2 ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; source deactivate unicycler ; cd ",current_dir], shell=True)
             except:
                 logging.info(": Assembly unsuccessful.") # Removing from downstream analysis.")
 
@@ -351,6 +420,7 @@ def main():
         #Run Quast
         if not args.noquast and not args.noex:
             logging.info('Running Quast on assemblies')
+            check_quast_version(version_output)
             createFolder(current_dir+'QC/Quast')
             try:
                 run_command(['quast.py ',current_dir,'assemblies/*fasta -o ',current_dir,'QC/Quast > ',current_dir,'logs/quast_',todays_date,'.log 2>&1'], shell=True)
@@ -371,6 +441,7 @@ def main():
         createFolder(current_dir+'analyses')
         if not args.nomlst and not args.noex:
             logging.info('Looking for MLST')
+            check_mlst_version(version_output)
             try:
                 run_command(['cd ',current_dir,'assemblies/ ; mlst *fasta > ',current_dir,'analyses/mlst.tsv ; cd ',current_dir], shell= True)
                 logging.info("Species and MLST identification success")
@@ -390,6 +461,8 @@ def main():
             if run_list:
                 createFolder(current_dir+'QC/Coverage') 
                 logging.info("Calculating average coverage of each sample")
+                check_bwa_version(version_output)
+                check_picard_version(version_output)
                 uniq_run_list = set(run_list)
                 # with open('uniq_coverage_list.txt', 'w') as w:
                 #     for item in uniq_run_list:
@@ -425,6 +498,8 @@ def main():
         #Run kleborate
         #ToDO: integrate Kleborate and ABRICATE in final report
         if args.klebs:
+            logging.info("Running Kleborate on your samples")
+            check_kleborate_version(version_output)
             try:
                 koutfile=(current_dir+'analyses/Kleborate_'+todays_date+'.txt') 
                 run_command(['kleborate --all -a ',current_dir,'assemblies/*fasta -o ',koutfile], shell= True) 
@@ -435,6 +510,8 @@ def main():
         if args.abricate_all or args.resfinder or args.argannot or args.card or args.ncbi or args.vfdb or args.ecoh or args.plasmidfinder:
             aboutpath=(current_dir+'analyses/') 
         if args.resfinder or args.abricate_all:
+            logging.info("Running ABRICATE resfinder on your samples")
+            check_abricate_version(version_output)
             try:
                 run_abricate(current_dir, uniq_run_list, 'resfinder', aboutpath)
             except:
