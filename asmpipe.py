@@ -393,7 +393,7 @@ def main():
                     f.write("%s\n" % item)
             try:
                 run_command(["cd ",trimmed_dir," ; parallel --jobs ",threads," 'echo {} ; unicycler -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
-                     -o ../assembly/{}_assembly --pilon_path ",pilon_path," --verbosity 2 --keep 2 ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; cd ",current_dir], shell=True)
+                     -o ../assembly/{}_assembly --pilon_path ",pilon_path," --verbosity 2 --keep 2 --no_correct ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; cd ",current_dir], shell=True)
             except:
                 logging.info(": Assembly unsuccessful.") # Removing from downstream analysis.")
 
