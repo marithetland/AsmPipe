@@ -41,7 +41,7 @@ def parse_args():
     parser.add_argument('--nomlst', action='store_true', required=False, help='Do not run MLST')
     parser.add_argument('--noquast', action='store_true', required=False, help='Do not run Quast')
     parser.add_argument('--nocov', action='store_true', required=False, help='Do not calculate X')
-    parser.add_argument('--pilon_path', type=str, required=False, help='Specify pilon path. Default: /opt/anaconda/anaconda3/envs/klebgap_assembly/share/pilon-1.22-1/pilon-1.22.jar')
+    parser.add_argument('--pilon_path', type=str, required=False, help='Specify pilon path. Default: /opt/anaconda/anaconda3/envs/klebgap_assembly/share/pilon-1.23-3/pilon-1.23.jar')
 
     parser.add_argument('--klebs', action='store_true', required=False, help='Run Kleborate, with option --all')
     parser.add_argument('--argannot', action='store_true', required=False, help='Search the ARGannot databse using Abricate')
@@ -199,7 +199,7 @@ def main():
         print('Coverage will not be calculated.')
     #pilon_path
     if not args.pilon_path:
-        pilon_path="/opt/anaconda/anaconda3/envs/klebgap_assembly/share/pilon-1.22-1/pilon-1.22.jar"
+        pilon_path="/opt/anaconda/anaconda3/envs/klebgap_assembly/share/pilon-1.23-3/pilon-1.23.jar"
     else:
         pilon_path=args.pilon_path
     print(pilon_path)
