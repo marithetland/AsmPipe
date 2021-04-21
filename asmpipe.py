@@ -115,6 +115,10 @@ def check_pilon_version(pilon_path,version_output):
     run_command(['echo "pilon\t',pilon_path,'" >> versions_',version_output,'.txt'], shell=True)     ##Check for empty results, skip
     pass
 
+def check_cutadapt_version(version_output):
+    run_command(['cutadapt --version | sed "s/^/cutadapt\t/g" >> versions_',version_output,'.txt'], shell=True)     ##Check for empty results, skip
+    pass
+
 def check_fastqc_version(version_output):
     run_command(['fastqc --version >> versions_',version_output,'.txt'], shell=True)     ##Check for empty results, skip
     pass
@@ -139,7 +143,7 @@ def check_samtools_version(version_output):
     run_command(['samtools --version | grep samtools >> versions_',version_output,'.txt'], shell=True)     ##Check for empty results, skip
     pass
 
-def check_samtools_version(version_output):
+def check_picard_version(version_output):
     run_command(['picard 2>&1 SamFormatConverter --version | sed "s/^/picard\t/g" >> versions_',version_output,'.txt'], shell=True)     ##Check for empty results, skip
     pass
 
@@ -302,12 +306,13 @@ def main():
         if run_list:
             logging.info("Running TrimGalore")
             check_trimgalore_version(version_output)
+            check_cutadapt_version(version_output)
             uniq_run_list = set(run_list)
             with open('uniq_trimgalore_list.txt', 'w') as w:
                 for item in uniq_run_list:
                     w.write("%s\n" % item)
             try:
-                run_command(["parallel --jobs ",threads," 'echo {} ; trim_galore --paired -trim1 {}_1.fastq.gz {}_2.fastq.gz >> ./logs/{}_trimgalore.log 2>&1' ::: $(cat ",current_dir,"uniq_trimgalore_list.txt) ; cd ",current_dir ], shell=True)
+                run_command(["parallel --jobs ",threads," 'echo {} ; trim_galore --paired {}_1.fastq.gz {}_2.fastq.gz >> ./logs/{}_trimgalore.log 2>&1' ::: $(cat ",current_dir,"uniq_trimgalore_list.txt) ; cd ",current_dir ], shell=True)
                 logging.info(item+": TrimGalore success.")
                 run_command(['mv *val* ./trimmed_reads 2>/dev/null'], shell=True)
                 #TODO:ADD size-check:run_command(['if [ -s "" ] ; then echo "WARNING: Trimmed file is empty, please check." ; fi'], shell=True)
@@ -346,7 +351,7 @@ def main():
             #for item in run_list: 
                 try:
                     #run_command(['fastqc ',current_dir,'trimmed_reads/', item, ' -o QC/fastQC > ',current_dir,'logs/',item,'_fastqc_trimmed_',todays_date,'.log 2>&1' ], shell=True)
-                    run_command(["parallel --jobs ",unic_threads," 'echo {} ; fastqc ./trimmed_reads/{} -o QC/fastQC >> ./logs/{}_fastqc_trimmed.log 2>&1' ::: $(cat ",current_dir,"uniq_fastqc_list.txt) ; cd ",current_dir ], shell=True)
+                    run_command(["parallel --jobs ",threads," 'echo {} ; fastqc ./trimmed_reads/{} -o QC/fastQC >> ./logs/{}_fastqc_trimmed.log 2>&1' ::: $(cat ",current_dir,"uniq_fastqc_list.txt) ; cd ",current_dir ], shell=True)
 
                     logging.info(item+": FastQC success. ")
                 except:
@@ -392,7 +397,7 @@ def main():
                 for item in uniq_run_list:
                     f.write("%s\n" % item)
             try:
-                run_command(["cd ",trimmed_dir," ; parallel --jobs ",threads," 'echo {} ; unicycler -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
+                run_command(["cd ",trimmed_dir," ; parallel --jobs ",unic_threads," 'echo {} ; unicycler -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
                      -o ../assembly/{}_assembly --pilon_path ",pilon_path," --verbosity 2 --keep 2 --no_correct ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; cd ",current_dir], shell=True)
             except:
                 logging.info(": Assembly unsuccessful.") # Removing from downstream analysis.")
@@ -484,7 +489,7 @@ def main():
                         outfile=(current_dir+'QC/Coverage/overall_coverage.tsv') 
                         run_command(['bwa index ', fasta], shell= True)
                         
-                        run_command(['bwa mem -t 8 ',fasta,' ',trim_1,' ',trim_2,' > input_c.sam  ; \
+                        run_command(['bwa mem -t ',threads,' ',fasta,' ',trim_1,' ',trim_2,' > input_c.sam  ; \
                             picard SamFormatConverter INPUT=input_c.sam VALIDATION_STRINGENCY=SILENT OUTPUT=input_c.bam ; \
                             picard SortSam INPUT=input_c.bam OUTPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT SORT_ORDER=coordinate ; \
                             picard MarkDuplicates INPUT=input_2_c.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam METRICS_FILE=dup_metrics ; \
