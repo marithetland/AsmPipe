@@ -122,6 +122,8 @@ Things to check QC-wise
 [GNU General Public License, v3](https://www.gnu.org/licenses/gpl-3.0.html)
 
 ## Updates
+2021-04-21: Added version checks, fixed a bug with threading and most importantly: Added the flag `--no_correct` to the unicycler command to turn off spades read error correction. This is not needed as the files are QC'd with trim-galore first.
+
 2019-07-18: Added options to find \*fastq-gz files in subdirectories from previuos runs
 
 2019-07-18: Added options to not run parts of the pipeline, and added option to run kleborate (https://github.com/katholt/Kleborate) at the end of the pipeline
