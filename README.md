@@ -3,9 +3,9 @@
 
 Pipeline of tools used for quality assessment, assembly and gene detection from short-read Illumina sequences. Created for easy use at our microbiology research lab at Stavanger University Hopsital.
 
-This script will quality- and adapter-trim your data, create a FastQC report, assemble the trimmed FASTQ-reads using UniCycler, create a Quast QC-report, run mlst to identify sequence types and species, and will also calculate overall coverage (sequence depth) of each sample.
+This script will quality- and adapter-trim your data with trim_galore, create a FastQC report, assemble the trimmed FASTQ reads using Unicycler, create a Quast QC-report, run mlst to identify sequence types and species, and will calculate average read depth (or coverage) of each sample.
 
-The script creates a report summarising for each sample: Species, ST, no. reads, GC%, no. contigs, largest contig, total sequence length, N50, L50 and sequence depth.
+The script creates a report summarising for each sample: Species, ST, no. reads, GC%, no. contigs, largest contig, total sequence length, N50, L50 and read depth.
 
 ## Table of Contents
 
@@ -20,25 +20,24 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 These need to be installed and in path for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the ones I have tested.
 
 * Linux or MacOS
-* Python 3.5.0+
-* Pandas (`pip install pandas`)
+* Python 3.9.7
+* Pandas (`pip3 install pandas`)
 * Paralell (`conda install -c conda-forge parallel`)
-* FastQC v0.11.8 (https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) (`conda install -c bioconda fastqc`)
-* MultiQC v1.7 (https://multiqc.info/) (`conda install -c bioconda multiqc`)
-* CutAdapt (for TrimGalore) (`conda install -c bioconda cutadapt`)
-* TrimGalore v0.6.6 (https://www.bioinformatics.babraham.ac.uk/projects/trim_galore/)
-* SPAdes v3.13.0 (http://cab.spbu.ru/software/spades/) (`conda install -c bioconda spades=3.13.0`)
-* Pilon v1.23 (https://www.broadinstitute.org/gaag/pilon)  (`conda install -c bioconda pilon`)
-* Unicycler v0.4.9b (https://github.com/rrwick/Unicycler) 
-* BLAST+ (`conda install -c bioconda blast`)
-* Bowtie2 (`conda install -c bioconda bowtie2`)
+* FastQC v0.11.9 (https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) (`conda install -c bioconda fastqc`)
+* MultiQC v1.11 (https://multiqc.info/) (`conda install -c bioconda multiqc`)
+* CutAdapt v3.5 (for TrimGalore) (`conda install -c bioconda cutadapt`)
+* TrimGalore v0.6.7 (https://www.bioinformatics.babraham.ac.uk/projects/trim_galore/)
+* Unicycler v0.5.0 (https://github.com/rrwick/Unicycler#installation) 
+* SPAdes v3.15.3 (http://cab.spbu.ru/software/spades/) (`conda install -c bioconda spades=3.13.0`)
+* BLAST+ v2.12.0+ (`conda install -c bioconda blast`)
+* Bowtie2 v2.4.5 (`conda install -c bioconda bowtie2`)
 * Quast v5.0.2 (http://quast.sourceforge.net/quast) (`conda install -c bioconda quast`)
 * mlst v2.19.0 (https://github.com/tseemann/mlst) (`conda install -c conda-forge -c bioconda -c defaults mlst`)
 * BWA v0.7.17-r1188 (http://bio-bwa.sourceforge.net/) (`conda install -c bioconda bqa`)
-* SAMtools v1.9 (http://www.htslib.org/download/) (`conda install -c bioconda samtools `)
-* PicardTools v2.21.4-SNAPSHOT (https://broadinstitute.github.io/picard/) (`conda install -c bioconda picard`)
-* Optional: Kleborate v0.4.0-beta (https://github.com/katholt/Kleborate)
-* Optional: Abricate v0.8.10 (https://github.com/tseemann/abricate)
+* SAMtools v1.14 (http://www.htslib.org/download/) (`conda install -c bioconda samtools `)
+* PicardTools v2.18.29-0 (https://broadinstitute.github.io/picard/) (`conda install -c bioconda picard`)
+* Optional: Kleborate v2.20 (https://github.com/katholt/Kleborate) including Kaptive v2.0.0
+* Optional but recommended: Install all in a conda environment
 
 ## Basic usage
 
@@ -66,26 +65,18 @@ optional arguments:
   -h, --help            show this help message and exit
   -v, --version         show program's version number and exit
   -t THREADS, --threads THREADS
-                        Specify threads to use. Default: 4
-  --noex                Do not run fastQC, multiQC, Quast, MLST or Coverage
-                        calculation.
+                        Specify number of threads to use. Default: 4
+  --noex                Do not run fastQC, multiQC, Quast, MLST or
+                        read depth calculation.
   --nofqc               Do not run fastQC and multiQC
   --nomlst              Do not run MLST
   --noquast             Do not run Quast
-  --nocov               Do not calculate X
+  --nocov               Do not calculate read depth (X)
   --klebs               Run Kleborate, with option --all
-  --argannot            Search the ARGannot databse using Abricate
-  --resfinder           Search the RESfinder databse using Abricate
-  --plasmidfinder       Search the PlasmidFinder databse using Abricate
-  --card                Search the CARD databse using Abricate
-  --ncbi                Search the NCBI databse using Abricate
-  --ecoh                Search the ECOH databse using Abricate
-  --abricate_all        Search all the above databases using Abricate
-
 
 ```
 
-You can add more FASTQ-files to the same output-directories/summary-report, by adding the FASTQ-files to the inital input-directory, leaving the output-folder structure as it was created and re-unning the pipeline.
+You can add more FASTQ-files to the same output-directories/summary-report, by adding the FASTQ-files to the inital input-directory, leaving the output-folder structure as it was created and re-running the pipeline.
 
 Note: This was initially created for scientist with little/no coding-experience to easily perform assembly, therefore, this script currently only works when you run it from the folder the FASTQ-files are in, and output-files are stored in the same directory. In the future, I will add input and output-options.
  
@@ -119,14 +110,16 @@ The following output-files are created when running AsmPipe:
 Things to check QC-wise
 * That GC% matches the sample species
 * That the total length matches the sample species
-* That you do not have a high number of contigs (ideally <700)
-* That you do not have low coverage (ideally >30X)
+* That you do not have a high number of contigs (ideally <500)
+* That you do not have low average read depth (ideally >40X)
 * A low number og long contigs is preferable to a high number of contigs with short contigs
 
 ## License
 [GNU General Public License, v3](https://www.gnu.org/licenses/gpl-3.0.html)
 
 ## Updates
+2022-02-03: Updated pipeline to work with newest release of Unicycler (v0.5.0). Unicycler no longer uses pilon for polishing and read error correction is by default turned off, so these options have been removed from the pipeline. Also removed option for abricate as it does not work. Also updated some terms to stop confusion: The folder "assemblies" is now "fasta", "coverage" is now "read depth", and the final report from the pipeline is prefixed with "Asmbl" rather than "AsmPipe".
+
 2021-04-21: Added version checks, fixed a bug with threading and most importantly: Added the flag `--no_correct` to the unicycler command to turn off spades read error correction. This is not needed as the files are QC'd with trim-galore first.
 
 2019-07-18: Added options to find \*fastq-gz files in subdirectories from previuos runs
@@ -135,5 +128,5 @@ Things to check QC-wise
 
 2019-10-29: Added options to run ABRICATE as part of the pipeline, and created output-folder "analyses" to put mlst, kleborate and ABRICATE-outputs in. Also added merge_runs.sh which you can use to merge two parent folders with the same structure (from this script). 
 
-2019-10-30: Updated tool versions in README
+2019-10-30: Updated tool versions in README.
 

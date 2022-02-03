@@ -8,12 +8,11 @@ This is an automated pipeline for use in the microbiology lab @SUS
 The script takes as input short-read FASTQ files and:
 1) QC's the samples with FastQC and Quast
 2) Trims the samples with TrimGalore (cutadapt)
-3) Assembles the samples using Unicycler
-4) Calculates overall coverage/sequence depth
-5) Assesses species and sequence type (ST) using mlst
+3) Assembles the samples using Unicycler (SPAdes)
+4) Calculates average read depth for each genome
+5) Looks for species and sequence type (ST) using mlst
 6) Produces a QC summary-file
-7) Alternatively also runs Kleborate on klebsiella-species or
-8) Abricate
+7) Can also run Kleborate on Klebsiella or othter Enterobacterales
 '''
 
 #import modules
@@ -33,25 +32,17 @@ from subprocess import call
 def parse_args():
     #Version
     parser = ArgumentParser(description='ASMBL')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + "v.0.1.0")
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + "v.0.2.0")
     
     parser.add_argument('-t','--threads', type=int, default=4, required=False, help='Specify threads to use. Default: 4')
-    parser.add_argument('--noex', action='store_true', required=False, help='Do not run fastQC, multiQC, Quast, MLST or Coverage calculation.')
+    parser.add_argument('--noex', action='store_true', required=False, help='Do not run fastQC, multiQC, Quast, MLST or read depth calculation.')
     parser.add_argument('--nofqc', action='store_true', required=False, help='Do not run fastQC and multiQC')
     parser.add_argument('--nomlst', action='store_true', required=False, help='Do not run MLST')
     parser.add_argument('--noquast', action='store_true', required=False, help='Do not run Quast')
-    parser.add_argument('--nocov', action='store_true', required=False, help='Do not calculate X')
-    parser.add_argument('--pilon_path', type=str, required=False, help='Specify pilon path. Default: /opt/anaconda/anaconda3/envs/klebgap_assembly/share/pilon-1.23-3/pilon-1.23.jar')
+    parser.add_argument('--nocov', action='store_true', required=False, help='Do not calculate read depth X')
+    parser.add_argument('-d','--depth_filter', type=str, required=False, help='Specify unicycler depth filter. Default 0.25 relative to chromosomal depth.')
 
     parser.add_argument('--klebs', action='store_true', required=False, help='Run Kleborate, with option --all')
-    parser.add_argument('--argannot', action='store_true', required=False, help='Search the ARGannot databse using Abricate')
-    parser.add_argument('--resfinder', action='store_true', required=False, help='Search the RESfinder databse using Abricate')
-    parser.add_argument('--plasmidfinder', action='store_true', required=False, help='Search the PlasmidFinder databse using Abricate')
-    parser.add_argument('--card', action='store_true', required=False, help='Search the CARD databse using Abricate')
-    parser.add_argument('--ncbi', action='store_true', required=False, help='Search the NCBI databse using Abricate')
-    parser.add_argument('--ecoh', action='store_true', required=False, help='Search the ECOH databse using Abricate')
-    parser.add_argument('--vfdb', action='store_true', required=False, help='Search the ECOH databse using Abricate')
-    parser.add_argument('--abricate_all', action='store_true', required=False, help='Search all the above databases using Abricate')
 
     return parser.parse_args()
 
@@ -111,10 +102,6 @@ def check_trimgalore_version(version_output):
     run_command(['trimgalversion=$(trim_galore --version | grep version | tr -d " " | sed "s/^/trim_galore\t/g" ) ; echo $trimgalversion >> versions_',version_output,'.txt'], shell=True)     ##Check for empty results, skip
     pass
 
-def check_pilon_version(pilon_path,version_output):
-    run_command(['echo "pilon\t',pilon_path,'" >> versions_',version_output,'.txt'], shell=True)     ##Check for empty results, skip
-    pass
-
 def check_cutadapt_version(version_output):
     run_command(['cutadapt --version | sed "s/^/cutadapt\t/g" >> versions_',version_output,'.txt'], shell=True)     ##Check for empty results, skip
     pass
@@ -140,7 +127,7 @@ def check_bwa_version(version_output):
     pass
 
 def check_samtools_version(version_output):
-    run_command(['samtools --version | grep samtools >> versions_',version_output,'.txt'], shell=True)     ##Check for empty results, skip
+    run_command(['samtools --version | grep samtools >> versions_',version_output,'.txt'], shell=True)    ##Check for empty results, skip
     pass
 
 def check_picard_version(version_output):
@@ -191,6 +178,13 @@ def main():
     print('Using '+ str(threads) + ' threads')
     print('Using '+ str(unic_threads + ' threads for unicycler x8 threads assembly'))
 
+    if not args.depth_filter:
+        depth_filter=str(0.25)
+        print('Unicycler depth filter set to default: '+ str(depth_filter))
+    else:
+        depth_filter=str(args.depth_filter)
+        print('Unicycler depth filter set to: '+ str(depth_filter))
+
     if args.noex:
         print('Trimming and assembling reads only, no QC or downstream analyses.')
     if args.nofqc:
@@ -200,37 +194,17 @@ def main():
     if args.noquast:
         print('Quast will not be run.')
     if args.nocov:
-        print('Coverage will not be calculated.')
-    #pilon_path
-    if not args.pilon_path:
-        pilon_path="/opt/anaconda/anaconda3/envs/klebgap_assembly/share/pilon-1.23-3/pilon-1.23.jar"
-    else:
-        pilon_path=args.pilon_path
-    print(pilon_path)
+        print('Read depth will not be calculated.')
 
     
 
     if not args.noex and not args.nofqc and not args.nomlst and not args.noquast and not args.nocov and not args.klebs:
-        print("Pipeline will be run with: TrimGalore, fastQC, multiQC, Unicycler, Quast, mlst and coverage calculation.")
+        print("Pipeline will be run with: TrimGalore, fastQC, multiQC, Unicycler, Quast, mlst and read depth calculation.")
     if not args.noex and not args.nofqc and not args.nomlst and not args.noquast and not args.nocov and args.klebs:
-        print("Pipeline will be run with: TrimGalore, fastQC, multiQC, Unicycler, Quast, mlst, coverage calculation and kleborate.")
+        print("Pipeline will be run with: TrimGalore, fastQC, multiQC, Unicycler, Quast, mlst, read depth calculation and kleborate.")
     else:
         if args.klebs:
             print('Kleborate will be run on all samples with option --all.')
-    if args.abricate_all:
-        print('Search of databases using Abricate on all samples will be performed.')
-    if args.argannot:
-        print('Search of ARGannot database using Abricate on all samples will be performed.')
-    if args.resfinder:
-        print('Search of resfinder database using Abricate on all samples will be performed.')
-    if args.plasmidfinder:
-        print('Search of plasmidfinder database using Abricate on all samples will be performed.')
-    if args.card:
-        print('Search of card database using Abricate on all samples will be performed.')
-    if args.ncbi:
-        print('Search of ncbi database using Abricate on all samples will be performed.')
-    if args.ecoh:
-        print('Search of ecoh database using Abricate on all samples will be performed.')
 
     #Set current working directory
     current_dir = os.getcwd()
@@ -370,7 +344,7 @@ def main():
         
         #Assembly
         createFolder(current_dir+'assembly') 
-        createFolder(current_dir+'assemblies/')
+        createFolder(current_dir+'fasta/')
         createFolder(current_dir+'Fastq_raw')
         createFolder(current_dir+'success') 
 
@@ -384,13 +358,13 @@ def main():
                 run_list.append(seq)
 
         trimmed_dir=(current_dir+'trimmed_reads/')
-        assembly_dir=(current_dir+'assemblies/')
+        assembly_dir=(current_dir+'fasta/')
         
         if run_list:
             logging.info("Running Unicycler assembly on unassembled files")
             check_unicycler_version(version_output)
             check_spades_version(version_output)
-            check_pilon_version(pilon_path,version_output)
+
             check_samtools_version(version_output)
             uniq_run_list = set(run_list)
             with open('uniq_run_list_as.txt', 'w') as f:
@@ -398,7 +372,7 @@ def main():
                     f.write("%s\n" % item)
             try:
                 run_command(["cd ",trimmed_dir," ; parallel --jobs ",unic_threads," 'echo {} ; unicycler -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
-                     -o ../assembly/{}_assembly --pilon_path ",pilon_path," --verbosity 2 --keep 2 --no_correct ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; cd ",current_dir], shell=True)
+                     -o ../assembly/{}_assembly --verbosity 2 --keep 2 --depth_filter ",depth_filter," ; touch ../success/{}_Assembly_complete.txt; mv ../{}_?.fastq.gz ../Fastq_raw' ::: $(cat ",current_dir,"uniq_run_list_as.txt) ; cd ",current_dir], shell=True)
             except:
                 logging.info(": Assembly unsuccessful.") # Removing from downstream analysis.")
 
@@ -413,12 +387,12 @@ def main():
                         os.rename(os.path.join(root, f), os.path.join(root, "{}_{}".format(prefix, f)))
         except:
             pass
-        #Copy files to assemblies-directory
+        #Copy files to fasta-directory
         try:
             for files in glob.glob(current_dir + 'assembly/**/*assembly.fasta', recursive=True):
                 filename = os.path.basename(files)
-                if not os.path.exists(os.path.join(current_dir+'assemblies/', filename)):
-                    copyfile(files, os.path.join(current_dir+'assemblies/',filename))
+                if not os.path.exists(os.path.join(current_dir+'fasta/', filename)):
+                    copyfile(files, os.path.join(current_dir+'fasta/',filename))
         except:
             pass
 
@@ -431,11 +405,11 @@ def main():
        
         #Run Quast
         if not args.noquast and not args.noex:
-            logging.info('Running Quast on assemblies')
+            logging.info('Running Quast on fasta')
             check_quast_version(version_output)
             createFolder(current_dir+'QC/Quast')
             try:
-                run_command(['quast.py ',current_dir,'assemblies/*fasta -o ',current_dir,'QC/Quast > ',current_dir,'logs/quast_',todays_date,'.log 2>&1'], shell=True)
+                run_command(['quast.py ',current_dir,'fasta/*fasta -o ',current_dir,'QC/Quast > ',current_dir,'logs/quast_',todays_date,'.log 2>&1'], shell=True)
                 logging.info("Quast successful")
                 logging.info('Remember to open the transposed_report.tsv file to assess the quality of your assembled reads - main points to look at: Total contigs (<700, GC% (should match the species), total length (should match the species), and have a general look at largest contig, N50 and L50 values.')
                 #Create Quast report
@@ -455,28 +429,28 @@ def main():
             logging.info('Looking for MLST')
             check_mlst_version(version_output)
             try:
-                run_command(['cd ',current_dir,'assemblies/ ; mlst *fasta > ',current_dir,'analyses/mlst.tsv ; cd ',current_dir], shell= True)
+                run_command(['cd ',current_dir,'fasta/ ; mlst *fasta > ',current_dir,'analyses/mlst.tsv ; cd ',current_dir], shell= True)
                 logging.info("Species and MLST identification success")
             except:
-                logging.info("Species and MLST identification failed. Check input-directory. Alternatively, run mlst manually on the terminal in the ./assemblies-directory: 'mlst *fasta >> mlst.tsv '")
+                logging.info("Species and MLST identification failed. Check input-directory. Alternatively, run mlst manually on the terminal in the ./fasta-directory: 'mlst *fasta >> mlst.tsv '")
 
-        #Get average coverage and std deviation
+        #Get average read depth and its std deviation
         if not args.nocov and not args.noex:
             run_list = []
             for seq in sequence_list:
-                if os.path.isfile(current_dir + 'success/'+seq+'_Coverage.Success'):
-                    logging.info(seq+": Coverage has been calculated.")
+                if os.path.isfile(current_dir + 'success/'+seq+'_readDepth.Success'):
+                    logging.info(seq+": Average Read Depth has been calculated.")
                 else:
                     run_list.append(seq)
-                    logging.info(seq+": Coverage has not been calculated.")
+                    logging.info(seq+": Average Read Depth  has not been calculated.")
 
             if run_list:
-                createFolder(current_dir+'QC/Coverage') 
-                logging.info("Calculating average coverage of each sample")
+                createFolder(current_dir+'QC/readDepth') 
+                logging.info("Calculating average read depth of each sample")
                 check_bwa_version(version_output)
                 check_picard_version(version_output)
                 uniq_run_list = set(run_list)
-                # with open('uniq_coverage_list.txt', 'w') as w:
+                # with open('uniq_readDepth_list.txt', 'w') as w:
                 #     for item in uniq_run_list:
                 #         w.write("%s\n" % item)
                 for item in uniq_run_list: 
@@ -485,8 +459,8 @@ def main():
                         fasta=(current_dir+'assembly/'+item+'_assembly/'+item+'_assembly.fasta')
                         trim_1=(current_dir+'trimmed_reads/'+item+'_1_val_1.fq.gz')
                         trim_2=(current_dir+'trimmed_reads/'+item+'_2_val_2.fq.gz')
-                        indi_outfile=(current_dir+'QC/Coverage/'+item+'_X.tsv') 
-                        outfile=(current_dir+'QC/Coverage/overall_coverage.tsv') 
+                        indi_outfile=(current_dir+'QC/readDepth/'+item+'_X.tsv') 
+                        outfile=(current_dir+'QC/readDepth/overall_readDepth.tsv') 
                         run_command(['bwa index ', fasta], shell= True)
                         
                         run_command(['bwa mem -t ',threads,' ',fasta,' ',trim_1,' ',trim_2,' > input_c.sam  ; \
@@ -496,15 +470,15 @@ def main():
                             picard BuildBamIndex INPUT=final_cont.bam VALIDATION_STRINGENCY=SILENT OUTPUT=final_cont.bam.bai ' ], shell= True)
                             
                         run_command(["echo -n '",item," \t' >> ",indi_outfile," ; tot_size=$(samtools view -H final_cont.bam | grep -P '^@SQ' | cut -f 3 -d ':' | awk '{sum+=$1} END {print sum}') ; echo $tot_size ; samtools depth final_cont.bam |awk -v var=$tot_size '{sum+=$3; sumsq+=$3*$3} END {print sum/var \"\t\" sqrt(sumsq/var - (sum/var)*2)}' >> ",indi_outfile," ; rm final_cont* dup_m* input* "  ], shell= True)
-                        logging.info(item+": Coverage calculation success.")
-                        run_command(['touch ',current_dir,'success/',item,'_Coverage.Success'], shell= True)
+                        logging.info(item+": Average Read Depth  calculation success.")
+                        run_command(['touch ',current_dir,'success/',item,'_readDepth.Success'], shell= True)
 
                     except:
-                        logging.info(item+": Coverage-calculation unsuccessful. Removing from downstream analysis.")
+                        logging.info(item+": Average Read Depth calculation unsuccessful. Removing from downstream analysis.")
                         sequence_list.remove(item)
                         unsuccessful_sequences.append(item)
-            outfile=(current_dir+'QC/Coverage/overall_coverage.tsv') 
-            cov_files=(current_dir+'QC/Coverage/*_X.tsv') 
+            outfile=(current_dir+'QC/_readDepth/overall__readDepth.tsv') 
+            cov_files=(current_dir+'QC/_readDepth/*_X.tsv') 
             run_command(['cat ',cov_files,' > ',outfile], shell= True)    
             
         #Run kleborate
@@ -514,7 +488,7 @@ def main():
             check_kleborate_version(version_output)
             try:
                 koutfile=(current_dir+'analyses/Kleborate_'+todays_date+'.txt') 
-                run_command(['kleborate --all -a ',current_dir,'assemblies/*fasta -o ',koutfile], shell= True) 
+                run_command(['kleborate --all -a ',current_dir,'fasta/*fasta -o ',koutfile], shell= True) 
             except:
                 print("Kleborate failed, do you have kleborate in your path?")
                 pass
@@ -561,10 +535,10 @@ def main():
     seq_df_mlst_quast = pd.merge(seq_df_mlst, quast_df_sub, on='Assembly', how='outer')
 
     #AVG COV + STDEV
-    cov_file = pd.read_csv(current_dir+'QC/Coverage/overall_coverage.tsv', sep='\t', header=None)
-    cov_file.columns = ['Assembly','Avg_coverage','StDev']
+    cov_file = pd.read_csv(current_dir+'QC/_readDepth/overall__readDepth.tsv', sep='\t', header=None)
+    cov_file.columns = ['Assembly','Avg_readDepth','StDev']
     cov_file = cov_file.replace(" ","", regex=True)
-    cov_df_sub = cov_file[['Assembly','Avg_coverage','StDev']]
+    cov_df_sub = cov_file[['Assembly','Avg_readDepth','StDev']]
     seq_df_mlst_quast_cov = pd.merge(seq_df_mlst_quast, cov_df_sub, on='Assembly', how='outer')
 
     #fastqc_file=
@@ -577,7 +551,7 @@ def main():
     fastqc_df_sub=fastqc_df_sub.drop_duplicates() #All pairs should have same number of reads/sequences
     seq_df_mlst_quast_cov_fastqc = pd.merge(seq_df_mlst_quast_cov, fastqc_df_sub, on='Assembly', how='outer')
 
-    seq_df_mlst_quast_cov_fastqc.to_csv(path_or_buf='AsmPipe_'+todays_date+'.csv', sep="\t")
+    seq_df_mlst_quast_cov_fastqc.to_csv(path_or_buf='Asmbl_'+todays_date+'.csv', sep="\t")
 
     try:   
             run_command(['mv *fastq.gz ./Fastq_raw 2>/dev/null'], shell=True)
