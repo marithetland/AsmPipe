@@ -32,7 +32,7 @@ from subprocess import call
 def parse_args():
     #Version
     parser = ArgumentParser(description='ASMBL')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + "v.0.2.0")
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + "v.1.0.0")
     
     parser.add_argument('-t','--threads', type=int, default=4, required=False, help='Specify threads to use. Default: 4')
     parser.add_argument('--noex', action='store_true', required=False, help='Do not run fastQC, multiQC, Quast, MLST or read depth calculation.')
@@ -477,8 +477,8 @@ def main():
                         logging.info(item+": Average Read Depth calculation unsuccessful. Removing from downstream analysis.")
                         sequence_list.remove(item)
                         unsuccessful_sequences.append(item)
-            outfile=(current_dir+'QC/_readDepth/overall__readDepth.tsv') 
-            cov_files=(current_dir+'QC/_readDepth/*_X.tsv') 
+            outfile=(current_dir+'QC/readDepth/overall__readDepth.tsv') 
+            cov_files=(current_dir+'QC/readDepth/*_X.tsv') 
             run_command(['cat ',cov_files,' > ',outfile], shell= True)    
             
         #Run kleborate
@@ -493,16 +493,16 @@ def main():
                 print("Kleborate failed, do you have kleborate in your path?")
                 pass
         #Run ABRICATE
-        if args.abricate_all or args.resfinder or args.argannot or args.card or args.ncbi or args.vfdb or args.ecoh or args.plasmidfinder:
-            aboutpath=(current_dir+'analyses/') 
-        if args.resfinder or args.abricate_all:
-            logging.info("Running ABRICATE resfinder on your samples")
-            check_abricate_version(version_output)
-            try:
-                run_abricate(current_dir, uniq_run_list, 'resfinder', aboutpath)
-            except:
-                print("Abricate failed, do you have abricate in your path?")
-                pass
+        #if args.abricate_all or args.resfinder or args.argannot or args.card or args.ncbi or args.vfdb or args.ecoh or args.plasmidfinder:
+            #aboutpath=(current_dir+'analyses/') 
+        #if args.resfinder or args.abricate_all:
+            #logging.info("Running ABRICATE resfinder on your samples")
+            #check_abricate_version(version_output)
+            #try:
+                #run_abricate(current_dir, uniq_run_list, 'resfinder', aboutpath)
+            #except:
+                #print("Abricate failed, do you have abricate in your path?")
+                #pass
 
         #if args.argannot or args.abricate_all:
            
@@ -526,18 +526,21 @@ def main():
     mlst_df = mlst_file.replace("_assembly.fasta","", regex=True)
     mlst_df_sub = mlst_df[['Assembly','species','ST']]
     seq_df_mlst = pd.merge(seq_df, mlst_df_sub, on='Assembly', how='outer')
+    seq_df_mlst_2 = seq_df_mlst.replace("-", "_", regex=True)
 
     quast_file = pd.read_csv(current_dir+'QC/Quast/transposed_report.tsv', sep='\t')
     quast_df = quast_file.replace("_assembly","", regex=True)
+    #TODO: Edit _ to - in quast
     quast_df.rename(columns={'# contigs (>= 0 bp)':'#contigs'}, inplace=True)
     quast_df.rename(columns={'Total length (>= 0 bp)':'Total_length'}, inplace=True)
     quast_df_sub = quast_df[['Assembly', '#contigs','GC (%)','N50', 'L50', 'Total_length', 'Largest contig']]
-    seq_df_mlst_quast = pd.merge(seq_df_mlst, quast_df_sub, on='Assembly', how='outer')
+    seq_df_mlst_quast = pd.merge(seq_df_mlst_2, quast_df_sub, on='Assembly', how='outer')
 
     #AVG COV + STDEV
-    cov_file = pd.read_csv(current_dir+'QC/_readDepth/overall__readDepth.tsv', sep='\t', header=None)
+    cov_file = pd.read_csv(current_dir+'QC/readDepth/overall__readDepth.tsv', sep='\t', header=None)
     cov_file.columns = ['Assembly','Avg_readDepth','StDev']
     cov_file = cov_file.replace(" ","", regex=True)
+    cov_file = cov_file.replace("-","_", regex=True)
     cov_df_sub = cov_file[['Assembly','Avg_readDepth','StDev']]
     seq_df_mlst_quast_cov = pd.merge(seq_df_mlst_quast, cov_df_sub, on='Assembly', how='outer')
 
@@ -545,12 +548,14 @@ def main():
     fastqc_file = pd.read_csv(current_dir+'QC/multiqc_trimmed/multiqc_data/multiqc_fastqc.txt', sep='\t')
     fastqc_df = fastqc_file.replace("_1_val_1","", regex=True)
     fastqc_df = fastqc_df.replace("_2_val_2","", regex=True)
+    fastqc_df = fastqc_df.replace("-","_", regex=True)
     fastqc_df.rename(columns={'Sample':'Assembly'}, inplace=True)
     fastqc_df.rename(columns={'Total Sequences':'#Reads'}, inplace=True)
     fastqc_df_sub = fastqc_df[['Assembly', '#Reads']]
     fastqc_df_sub=fastqc_df_sub.drop_duplicates() #All pairs should have same number of reads/sequences
     seq_df_mlst_quast_cov_fastqc = pd.merge(seq_df_mlst_quast_cov, fastqc_df_sub, on='Assembly', how='outer')
-
+    #seq_df_mlst_quast_cov_fastqc.Assembly = seq_df_mlst.Assembly # Could be useful for renaming filenames back to original
+    
     seq_df_mlst_quast_cov_fastqc.to_csv(path_or_buf='Asmbl_'+todays_date+'.csv', sep="\t")
 
     try:   
