@@ -57,6 +57,8 @@ process ASSEMBLY {
 
 process FASTQC {
         
+        errorStrategy "${params.failure_action}"
+
         input:
         file rawreads
 
@@ -71,6 +73,8 @@ process FASTQC {
 }
 
 process MULTIQC {
+
+        errorStrategy "${params.failure_action}"
 
         publishDir path:("QC"), mode: 'copy'
 
@@ -89,22 +93,26 @@ process MULTIQC {
 
 process FASTCOUNT {
 
+        errorStrategy "${params.failure_action}"
+
         input:
         file rawreads
 
         output: 
-        file('fast_count.csv')
+        file('fast_count.tsv')
 
+        //sed -i 's/_[12].fastq.gz//g' fast_count.tsv
         script:
         """
-        fast_count >> fast_count.csv
-        fast_count $rawreads >> fast_count.csv
-        sed -i 's/_[12].fastq.gz//g' fast_count.csv
+        fast_count >> fast_count.tsv
+        fast_count $rawreads >> fast_count.tsv
         """
 }
 
 process QUAST {
         
+        errorStrategy "${params.failure_action}"
+
         publishDir path:("QC"), mode: 'copy', saveAs: {filename -> "quast_transposed_report.tsv"}, pattern: 'quast_results/results*/transposed_report.tsv'
         publishDir path:("QC"), mode: 'copy', saveAs: {filename -> "quast_report.html"}, pattern: 'quast_results/results*/report.html'
 
@@ -123,6 +131,8 @@ process QUAST {
 
 process MLST {
 
+        errorStrategy "${params.failure_action}"
+
         publishDir path:("QC"), mode: 'copy'
 
         input:
@@ -133,12 +143,15 @@ process MLST {
 
         script:
         """
-        mlst $fasta
+        mlst $fasta > mlst.tsv
         """
 }
 
 
 process POLYPOLISH {
+        
+        errorStrategy "${params.failure_action}"
+        
         conda "$params.polypolish_env"
 
         publishDir path:("fasta/polypolish"), mode: 'copy', pattern: '*_polypolish.fasta'
@@ -164,6 +177,8 @@ process POLYPOLISH {
 
 process POLCA {
 
+        errorStrategy "${params.failure_action}"
+
         publishDir path:("fasta/polca"), mode: 'copy', pattern: '*_polypolish_polca.fasta'
 
         conda "$params.polca_env"
@@ -178,6 +193,21 @@ process POLCA {
         """
         polca.sh -a $polypolished -r "$illumina1 $illumina2" -t 16 -m 1G
         mv ${sample_id}_polypolish.fasta.PolcaCorrected.fa ${sample_id}_polypolish_polca.fasta
+        """
+}
+
+//test, need to combine all the report-files into one channel and specify them as path(input)
+process PANDAS {
+        input:
+        path(mlst)
+
+        output_
+        path("mlst_sub.tsv")
+
+        //take asmbl_pandas.py in as params in config?
+        script:
+        """
+        python /media/medmicro-d3/lupin/Anna/tester/230427_pandas_test/asmbl_pandas.py --mlst $mlst
         """
 }
 
@@ -233,5 +263,8 @@ workflow {
 
         //RUN MLST
         MLST(assembly_ch.map { it.drop(1)}.collect())
+
+        //RUN PANDAS
+        PANDAS(MLST.out)
 
 }
