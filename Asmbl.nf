@@ -41,7 +41,6 @@ process ASSEMBLY {
         input:
         tuple val(sample_id), path(reads1), path(reads2)
 
-        //Add path("unicycler/${sample_id}_assembly.gfa")?
         output:
         tuple val(sample_id), path("unicycler/${sample_id}_assembly.fasta"), emit: fasta_files
         path("unicycler/${sample_id}_assembly.gfa")
@@ -122,10 +121,27 @@ process QUAST {
         """
 }
 
+process MLST {
+
+        publishDir path:("QC"), mode: 'copy'
+
+        input:
+        path(fasta)
+
+        output:
+        path("mlst.tsv")
+
+        script:
+        """
+        mlst $fasta
+        """
+}
+
+
 process POLYPOLISH {
         conda "$params.polypolish_env"
 
-        publishDir path:("polypolish"), mode: 'copy', pattern: '*_polypolish.fasta'
+        publishDir path:("fasta/polypolish"), mode: 'copy', pattern: '*_polypolish.fasta'
 
         input:
         tuple val(sample_id), path(illumina1), path(illumina2), path(fasta)
@@ -148,7 +164,7 @@ process POLYPOLISH {
 
 process POLCA {
 
-        publishDir path:("polca"), mode: 'copy', pattern: '*_polypolish_polca.fasta'
+        publishDir path:("fasta/polca"), mode: 'copy', pattern: '*_polypolish_polca.fasta'
 
         conda "$params.polca_env"
 
@@ -215,5 +231,7 @@ workflow {
         //RUN QUAST
         QUAST(assembly_ch.map { it.drop(1)}.collect())
 
+        //RUN MLST
+        MLST(assembly_ch.map { it.drop(1)}.collect())
 
 }
