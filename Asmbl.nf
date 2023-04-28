@@ -60,7 +60,7 @@ process FASTQC {
         errorStrategy "${params.failure_action}"
 
         input:
-        file rawreads
+        path(rawreads)
 
         output:
         path("*fastqc.zip")
@@ -79,10 +79,11 @@ process MULTIQC {
         publishDir path:("QC"), mode: 'copy'
 
         input:
-        file fastqc_files
+        path(fastqc_files)
         
         output:
-        file ("multiqc_report.html")
+        path ("multiqc_report.html")
+        path ("multiqc_fastqc.txt")
 
         script:
         """
@@ -96,10 +97,10 @@ process FASTCOUNT {
         errorStrategy "${params.failure_action}"
 
         input:
-        file rawreads
+        path(rawreads)
 
         output: 
-        file('fast_count.tsv')
+        path('fast_count.tsv')
 
         //sed -i 's/_[12].fastq.gz//g' fast_count.tsv
         script:
@@ -120,8 +121,8 @@ process QUAST {
         path(fasta)
 
         output:
-        file('quast_results/results*/transposed_report.tsv')
-        file ('quast_results/results*/report.html')
+        path('quast_results/results*/transposed_report.tsv')
+        path('quast_results/results*/report.html')
 
         script:
         """
@@ -264,7 +265,14 @@ workflow {
         //RUN MLST
         MLST(assembly_ch.map { it.drop(1)}.collect())
 
+        //Combine or group mlst, quast, fast_count and multiqc into one channel. 
+        //FASTCOUNT.out
+        //MLST.out
+        //
+        report_ch = [MLST.out, QUAST.out[0], FASTCOUNT.out, MULTIQC.out]
+        report_ch.view()
+
         //RUN PANDAS
-        PANDAS(MLST.out)
+       // PANDAS(report_ch)
 
 }
