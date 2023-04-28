@@ -7,7 +7,7 @@ reads_ch = Channel
         .fromFilePairs([params.reads_type1, params.reads_type2], flat: true)
 
 
-//trim_galore or fastp?
+//TRIM_GALORE
 process	TRIMMING {
 
         errorStrategy "${params.failure_action}"
@@ -29,13 +29,39 @@ process	TRIMMING {
         """
 }
 
-//unicycler or spades
+// //UNICYCLER
+// process ASSEMBLY {
+
+//         errorStrategy "${params.failure_action}"
+
+//         publishDir path:("fasta/unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.fasta"}, pattern: 'unicycler/*.fasta'
+//         publishDir path:("gfa_unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: 'unicycler/*.gfa'
+//         publishDir path:("logs/unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_unicycler.log"}, pattern: 'unicycler/unicycler.log'
+
+//         input:
+//         tuple val(sample_id), path(reads1), path(reads2)
+
+//         output:
+//         tuple val(sample_id), path("unicycler/assembly.fasta"), emit: fasta_files
+//         path("unicycler/assembly.gfa")
+//         path("unicycler/unicycler.log")
+
+
+//         script:
+//         """
+//         unicycler -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
+//         """
+// }
+
+
+
+//UNICYCLER
 process ASSEMBLY {
 
         errorStrategy "${params.failure_action}"
 
         publishDir path:("fasta"), mode: 'copy', pattern: 'unicycler/*.fasta'
-        publishDir path:("gfa"), mode: 'copy', pattern: 'unicycler/*.gfa'
+        publishDir path:("gfa_unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: 'unicycler/*.gfa'
         publishDir path:("logs/unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_unicycler.log"}, pattern: 'unicycler/unicycler.log'
 
         input:
@@ -55,6 +81,7 @@ process ASSEMBLY {
         """
 }
 
+//FASTQC
 process FASTQC {
         
         errorStrategy "${params.failure_action}"
@@ -72,18 +99,20 @@ process FASTQC {
         """
 }
 
+//MULTIQC
 process MULTIQC {
 
         errorStrategy "${params.failure_action}"
 
-        publishDir path:("QC"), mode: 'copy'
+        publishDir path:("QC"), mode: 'copy', pattern: 'multiqc_report.html'
+        publishDir path:("QC/reports"), mode: 'copy',  saveAs: {filename -> "multiqc_fastqc.txt"} ,pattern: 'multiqc_data/multiqc_fastqc.txt'
 
         input:
         path(fastqc_files)
         
         output:
-        path ("multiqc_report.html")
-        path ("multiqc_data/multiqc_fastqc.txt")
+        path("multiqc_report.html")
+        path("multiqc_data/multiqc_fastqc.txt"), emit: report
 
         script:
         """
@@ -91,10 +120,12 @@ process MULTIQC {
         """
 }
 
-
+//FAST_COUNT
 process FASTCOUNT {
 
         errorStrategy "${params.failure_action}"
+
+        publishDir path:("QC/reports"), mode: 'copy', pattern: 'fast_count.tsv'
 
         input:
         path(rawreads)
@@ -102,7 +133,6 @@ process FASTCOUNT {
         output: 
         path('fast_count.tsv')
 
-        //sed -i 's/_[12].fastq.gz//g' fast_count.tsv
         script:
         """
         fast_count >> fast_count.tsv
@@ -110,19 +140,20 @@ process FASTCOUNT {
         """
 }
 
+//QUAST
 process QUAST {
         
         errorStrategy "${params.failure_action}"
 
-        publishDir path:("QC"), mode: 'copy', saveAs: {filename -> "quast_transposed_report.tsv"}, pattern: 'quast_results/results*/transposed_report.tsv'
+        publishDir path:("QC/reports"), mode: 'copy', saveAs: {filename -> "quast_transposed_report.tsv"}, pattern: 'quast_results/results*/transposed_report.tsv'
         publishDir path:("QC"), mode: 'copy', saveAs: {filename -> "quast_report.html"}, pattern: 'quast_results/results*/report.html'
 
         input:
         path(fasta)
 
         output:
-        path('quast_results/results*/transposed_report.tsv')
-        path('quast_results/results*/report.html')
+        path("quast_results/results*/transposed_report.tsv"), emit: rep
+        path("quast_results/results*/report.html")
 
         script:
         """
@@ -130,11 +161,12 @@ process QUAST {
         """
 }
 
+//MLST
 process MLST {
 
         errorStrategy "${params.failure_action}"
 
-        publishDir path:("QC"), mode: 'copy'
+        publishDir path:("QC/reports"), mode: 'copy'
 
         input:
         path(fasta)
@@ -148,7 +180,7 @@ process MLST {
         """
 }
 
-
+//POLYPOLISH
 process POLYPOLISH {
         
         errorStrategy "${params.failure_action}"
@@ -176,6 +208,7 @@ process POLYPOLISH {
         """
 }
 
+//POLCA
 process POLCA {
 
         errorStrategy "${params.failure_action}"
@@ -188,6 +221,7 @@ process POLCA {
         tuple val(sample_id), path(illumina1), path(illumina2), path(polypolished)
 
         output:
+        path("${sample_id}_polypolish_polca.fasta")
 
         //if the project directories are going to be deleted, the new name made by using mv can instead be done through publishDir with "filename"
         script:
@@ -197,18 +231,21 @@ process POLCA {
         """
 }
 
-//test, need to combine all the report-files into one channel and specify them as path(input)
+//FINAL_REPORT
 process PANDAS {
-        input:
-        path(mlst)
 
-        output_
-        path("mlst_sub.tsv")
+publishDir path:("QC"), mode: 'copy'
+
+        input:
+        tuple path(mlst), path(quast), path(multiqc), path(fast_count)
+
+        output:
+        path("final_report.tsv")
 
         //take asmbl_pandas.py in as params in config?
         script:
         """
-        python /media/medmicro-d3/lupin/Anna/tester/230427_pandas_test/asmbl_pandas.py --mlst $mlst
+        python ~/Programs/Asmbl-development-nf/asmbl_pandas.py --mlst $mlst --quast $quast --multiqc $multiqc --fast_count $fast_count
         """
 }
 
@@ -226,7 +263,6 @@ workflow {
         }
 
         //RUN UNICYCLER
-        //added .out.fastafiles cause I didnt want the log and gfa as output
         ASSEMBLY(trimmed_ch)
         assembly_ch = ASSEMBLY.out.fasta_files
 
@@ -249,7 +285,9 @@ workflow {
         //MAKE LIST OF FASTQ FOR FAST_COUNT
         fastq_list_ch = reads_ch.map { it.drop(1) }.collect()
         //RUN FAST_COUNT
-        FASTCOUNT(fastq_list_ch)
+        fc_report = FASTCOUNT(fastq_list_ch)
+
+        
         
         //MAKE LIST OF VAL-FASTQ FOR FASTQC
         trimmed_list_ch = trimmed_ch.map { it.drop(1) }.collect()
@@ -257,22 +295,18 @@ workflow {
         fastqc_ch = FASTQC(trimmed_list_ch)
         //RUN MULTIQC
         MULTIQC(fastqc_ch)
-        
+        multiqc_report = MULTIQC.out.report
 
+        
         //RUN QUAST
         QUAST(assembly_ch.map { it.drop(1)}.collect())
+        quast_report = QUAST.out.rep
 
         //RUN MLST
-        MLST(assembly_ch.map { it.drop(1)}.collect())
-
-        //Combine or group mlst, quast, fast_count and multiqc into one channel. 
-        //FASTCOUNT.out
-        //MLST.out
-        //
-        report_ch = (MLST.out, QUAST.out[0], FASTCOUNT.out, MULTIQC.out).collect()
-        report_ch.view()
+        mlst_report = MLST(assembly_ch.map { it.drop(1)}.collect())
 
         //RUN PANDAS
-       // PANDAS(report_ch)
+        report_ch = mlst_report.concat( quast_report, multiqc_report, fc_report ).collect()
+        PANDAS(report_ch)
 
 }
