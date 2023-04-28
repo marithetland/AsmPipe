@@ -83,7 +83,7 @@ process MULTIQC {
         
         output:
         path ("multiqc_report.html")
-        path ("multiqc_fastqc.txt")
+        path ("multiqc_data/multiqc_fastqc.txt")
 
         script:
         """
@@ -269,7 +269,7 @@ workflow {
         //FASTCOUNT.out
         //MLST.out
         //
-        report_ch = [MLST.out, QUAST.out[0], FASTCOUNT.out, MULTIQC.out]
+        report_ch = (MLST.out, QUAST.out[0], FASTCOUNT.out, MULTIQC.out).collect()
         report_ch.view()
 
         //RUN PANDAS
