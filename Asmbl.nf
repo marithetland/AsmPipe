@@ -13,13 +13,12 @@ process LOADFASTQ {
         input:
         path(rawreads)
 
-
+        output:
 
         script:
         """
         load_fastq.py $rawreads
         """
-
 }
 
 
@@ -251,7 +250,7 @@ process POLCA {
 //FINAL_REPORT
 process PANDAS {
 
-publishDir path:("QC"), mode: 'copy'
+        publishDir path:("QC"), mode: 'copy'
 
         input:
         tuple path(mlst), path(quast), path(multiqc), path(fast_count)
@@ -266,6 +265,54 @@ publishDir path:("QC"), mode: 'copy'
         """
 }
 
+process RMLST {
+
+        input:
+        path(fasta)
+
+        output:
+
+        //May have to change this scripting... 
+        script:
+        """
+        python ~/Programs/rMLST/rmslt_script.py -f $fasta
+        """
+
+}
+
+process KMERFINDER {
+
+        publishDir path:("QC/kmerfinder"), mode: 'copy',  saveAs: {filename -> "${sample_id}_kmerfinder.csv"}
+
+        input:
+        tuple val(sample_id), path(fasta)
+
+        output:
+        path("results.txt")
+
+        //Change -db and -tax to a parameter in config file
+        //This program only accept one 
+        script:
+        """
+        kmerfinder.py -i $fasta -db ~/Programs/kmerfinder_db/bacteria/bacteria.ATG -tax ~/Programs/kmerfinder_db/bacteria/bacteria.tax
+        """
+}
+
+process KLEBORATE {
+        
+        publishDir path:("QC/Kleborate"), mode: 'copy'
+
+        input:
+        path(fasta)
+
+        output:
+        path("Kleborate_results.txt")
+
+        script:
+        """
+        kleborate --all -a $fasta
+        """
+}
 
 
 workflow {
@@ -330,4 +377,12 @@ workflow {
         report_ch = mlst_report.concat( quast_report, multiqc_report, fc_report ).collect()
         PANDAS(report_ch)
 
+        //rMLST
+        RMLST(assembly_ch.map { it.drop(1)}.collect())
+
+        //KMERFINDER
+        KMERFINDER(assembly_ch)
+
+        //KLEBORATE
+        KLEBORATE(assembly_ch.map { it.drop(1)}.collect())
 }
