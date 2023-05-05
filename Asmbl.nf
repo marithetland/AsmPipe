@@ -7,6 +7,23 @@ reads_ch = Channel
         .fromFilePairs([params.reads_type1, params.reads_type2], flat: true)
 
 
+
+process LOADFASTQ {
+
+        input:
+        path(rawreads)
+
+
+
+        script:
+        """
+        load_fastq.py $rawreads
+        """
+
+}
+
+
+
 //TRIM_GALORE
 process	TRIMMING {
 
@@ -250,7 +267,11 @@ publishDir path:("QC"), mode: 'copy'
 }
 
 
+
 workflow {
+
+        //Check fastq-files
+        LOADFASTQ(fastq_list_ch)
 
         //RUN TRIM_GALORE (or not)
         if ( params.trim ) {

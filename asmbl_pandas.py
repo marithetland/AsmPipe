@@ -25,6 +25,8 @@ quast_file = pd.read_csv(args.quast, sep='\t')
 quast_df = quast_file.replace("_assembly","", regex=True)
 quast_df.rename(columns={'# contigs (>= 0 bp)':'#contigs'}, inplace=True)
 quast_df.rename(columns={'Total length (>= 0 bp)':'Total_length'}, inplace=True)
+quast_df.rename(columns={'Largest contig':'Largest_contig'}, inplace=True)
+quast_df.rename(columns={'GC (%)':'GC(%)'}, inplace=True)
 quast_df_sub = quast_df[['Assembly', '#contigs','GC (%)','N50', 'L50', 'Total_length', 'Largest contig']]
 
 #MERGE MLST WITH QUAST
@@ -43,7 +45,7 @@ sum_fast_count_df = fast_count_df1.groupby('Assembly')['Read_depth'].sum()
 #MERGE FASTCOUNT WITH MLST + QUAST
 mlst_quast_fast_count = pd.merge(mlst_quast, sum_fast_count_df, on='Assembly', how='outer')
 #CALCULATE READ_DEPTH
-mlst_quast_fast_count["Read_depth"] = mlst_quast_fast_count["Read_depth"].div(mlst_quast_fast_count["Total_length"])
+mlst_quast_fast_count["Read_depth"] = mlst_quast_fast_count["Read_depth"].div(mlst_quast_fast_count["Total_length"]).round(2)
 
 
 #MULTIQC-file
@@ -59,4 +61,7 @@ multiqc_df_sub = multiqc_df_sub.drop_duplicates() #All pairs should have same nu
 mlst_quast_fast_count_multiqc = pd.merge(mlst_quast_fast_count, multiqc_df_sub, on='Assembly', how='outer')
 
 #MAKE FILE
-mlst_quast_fast_count_multiqc.to_csv(path_or_buf='final_report.tsv', sep="\t")
+mlst_quast_fast_count_multiqc.to_csv(path_or_buf='final_report.tsv', sep="\t", index=False)
+
+
+#round for å få kun to desimaler round(summ, 2)
