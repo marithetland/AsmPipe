@@ -271,7 +271,7 @@ publishDir path:("QC"), mode: 'copy'
 workflow {
 
         //Check fastq-files
-        LOADFASTQ(fastq_list_ch)
+        //LOADFASTQ(fastq_list_ch)
 
         //RUN TRIM_GALORE (or not)
         if ( params.trim ) {
