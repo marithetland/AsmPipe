@@ -21,6 +21,26 @@ process LOADFASTQ {
         """
 }
 
+process VERSIONS {
+
+        output:
+        path("versions.txt")
+
+        script:
+        """
+        echo "Program\tVersion" >> versions.txt
+        unicycler --version >> versions.txt
+        spades.py --version >> versions.txt
+        trim_galore --version | grep version | tr -d " " | sed "s/^/trim_galore\t/g" >> versions.txt
+        cutadapt --version | sed "s/^/cutadapt\t/g"  >> versions.txt
+        fastqc --version >> versions.txt
+        multiqc --version >> versions.txt
+        mlst --version >> versions.txt
+        quast.py --version >> versions.txt
+        kleborate --version >> versions.txt
+        """
+}
+
 
 
 //TRIM_GALORE
