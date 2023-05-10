@@ -1,27 +1,34 @@
 nextflow.enable.dsl=2
 
 
-
-//add checkIfExists: true? .fromFilePairs(params.reads, checkIfExists: true)
 reads_ch = Channel
         .fromFilePairs([params.reads_type1, params.reads_type2], flat: true)
 
-
-
+//Check if empty
+//Check if fastq format
+//Check if reads1 and reads2
+//Because of any(): True if any record, False if empty.
+//Change to all(): False if any false record, True if empty.
+//With or without handle?
 process LOADFASTQ {
 
         input:
-        path(rawreads)
+        tuple val(sample_id), path(reads1), path(reads2)
 
         output:
 
         script:
         """
-        load_fastq.py $rawreads
+        check_fastq.py $reads1
+        check_fastq.py $reads2
         """
 }
 
+//This will now always give new unicycler in file...
+//VERSION.TXT
 process VERSIONS {
+        
+        publishDir path:("QC"), mode: 'copy'
 
         output:
         path("versions.txt")
@@ -65,55 +72,59 @@ process	TRIMMING {
         """
 }
 
-// //UNICYCLER
-// process ASSEMBLY {
-
-//         errorStrategy "${params.failure_action}"
-
-//         publishDir path:("fasta/unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.fasta"}, pattern: 'unicycler/*.fasta'
-//         publishDir path:("gfa_unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: 'unicycler/*.gfa'
-//         publishDir path:("logs/unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_unicycler.log"}, pattern: 'unicycler/unicycler.log'
-
-//         input:
-//         tuple val(sample_id), path(reads1), path(reads2)
-
-//         output:
-//         tuple val(sample_id), path("unicycler/assembly.fasta"), emit: fasta_files
-//         path("unicycler/assembly.gfa")
-//         path("unicycler/unicycler.log")
-
-
-//         script:
-//         """
-//         unicycler -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
-//         """
-// }
-
-
 
 //UNICYCLER
 process ASSEMBLY {
 
         errorStrategy "${params.failure_action}"
 
-        publishDir path:("fasta"), mode: 'copy', pattern: 'unicycler/*.fasta'
-        publishDir path:("gfa_unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: 'unicycler/*.gfa'
+        publishDir path:("fasta"), mode: 'copy', pattern: '*.fasta'
+        publishDir path:("gfa_unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: '*.gfa'
         publishDir path:("logs/unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_unicycler.log"}, pattern: 'unicycler/unicycler.log'
 
         input:
         tuple val(sample_id), path(reads1), path(reads2)
 
         output:
-        tuple val(sample_id), path("unicycler/${sample_id}_assembly.fasta"), emit: fasta_files
-        path("unicycler/${sample_id}_assembly.gfa")
+        tuple val(sample_id), path("${sample_id}_assembly.fasta"), emit: fasta_files
+        path("${sample_id}_assembly.gfa")
         path("unicycler/unicycler.log")
 
 
         script:
         """
         unicycler -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
-        mv unicycler/assembly.fasta unicycler/${sample_id}_assembly.fasta
-        mv unicycler/assembly.gfa unicycler/${sample_id}_assembly.gfa
+        mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
+        mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
+        """
+}
+
+
+//UNICYCLER048
+process UNICYCLER048 {
+
+        errorStrategy "${params.failure_action}"
+
+        conda "$params.unicycler048_env"
+
+        publishDir path:("fasta"), mode: 'copy', pattern: '*.fasta'
+        publishDir path:("gfa_unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: '*.gfa'
+        publishDir path:("logs/unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_unicycler.log"}, pattern: 'unicycler/unicycler.log'
+
+        input:
+        tuple val(sample_id), path(reads1), path(reads2)
+
+        output:
+        tuple val(sample_id), path("${sample_id}_assembly.fasta"), emit: fasta_files
+        path("${sample_id}_assembly.gfa")
+        path("unicycler/unicycler.log")
+
+
+        script:
+        """
+        unicycler -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
+        mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
+        mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
         """
 }
 
@@ -216,60 +227,11 @@ process MLST {
         """
 }
 
-//POLYPOLISH
-process POLYPOLISH {
-        
-        errorStrategy "${params.failure_action}"
-        
-        conda "$params.polypolish_env"
-
-        publishDir path:("fasta/polypolish"), mode: 'copy', pattern: '*_polypolish.fasta'
-
-        input:
-        tuple val(sample_id), path(illumina1), path(illumina2), path(fasta)
-
-        output:
-        tuple val(sample_id), path("${sample_id}_polypolish.fasta")
-
-        //add seqkit sort --by-length --reverse contigs.fasta ??
-        //or
-        //add seqkit sort --by-length --reverse contigs.fasta | seqkit replace --pattern '.+' --replacement 'Contig_{nr}' ??
-        //include polypolish_insert_filter.py --in1 alignments_1.sam --in2 alignments_2.sam --out1 filtered_1.sam --out2 filtered_2.sam ??
-        script:
-        """
-        bwa index $fasta
-        bwa mem -t 16 -a $fasta $illumina1 > ${sample_id}_1.sam
-        bwa mem -t 16 -a $fasta $illumina2 > ${sample_id}_2.sam
-        polypolish $fasta ${sample_id}_1.sam ${sample_id}_2.sam > ${sample_id}_polypolish.fasta
-        """
-}
-
-//POLCA
-process POLCA {
-
-        errorStrategy "${params.failure_action}"
-
-        publishDir path:("fasta/polca"), mode: 'copy', pattern: '*_polypolish_polca.fasta'
-
-        conda "$params.polca_env"
-
-        input:
-        tuple val(sample_id), path(illumina1), path(illumina2), path(polypolished)
-
-        output:
-        path("${sample_id}_polypolish_polca.fasta")
-
-        //if the project directories are going to be deleted, the new name made by using mv can instead be done through publishDir with "filename"
-        script:
-        """
-        polca.sh -a $polypolished -r "$illumina1 $illumina2" -t 16 -m 1G
-        mv ${sample_id}_polypolish.fasta.PolcaCorrected.fa ${sample_id}_polypolish_polca.fasta
-        """
-}
 
 //FINAL_REPORT
 process PANDAS {
 
+        errorStrategy "${params.failure_action}"
         publishDir path:("QC"), mode: 'copy'
 
         input:
@@ -281,34 +243,38 @@ process PANDAS {
         //take asmbl_pandas.py in as params in config?
         script:
         """
-        python ~/Programs/Asmbl-development-nf/asmbl_pandas.py --mlst $mlst --quast $quast --multiqc $multiqc --fast_count $fast_count
+        asmbl_pandas.py --mlst $mlst --quast $quast --multiqc $multiqc --fast_count $fast_count
         """
 }
 
 process RMLST {
 
+        errorStrategy "${params.failure_action}" 
+        publishDir path:("QC/rMLST"), mode: 'copy'
+
         input:
         path(fasta)
 
         output:
+        path("rMLST.tsv")
 
-        //May have to change this scripting... 
         script:
         """
-        python ~/Programs/rMLST/rmslt_script.py -f $fasta
+        python ~/Programs/rMLST/rmlst_script.py -f $fasta >> rMLST.tsv
         """
 
 }
 
 process KMERFINDER {
 
+        errorStrategy "${params.failure_action}"
         publishDir path:("QC/kmerfinder"), mode: 'copy',  saveAs: {filename -> "${sample_id}_kmerfinder.csv"}
 
         input:
         tuple val(sample_id), path(fasta)
 
         output:
-        path("results.txt")
+        path("output/results.txt")
 
         //Change -db and -tax to a parameter in config file
         //This program only accept one 
@@ -320,6 +286,7 @@ process KMERFINDER {
 
 process KLEBORATE {
         
+        errorStrategy "${params.failure_action}"
         publishDir path:("QC/Kleborate"), mode: 'copy'
 
         input:
@@ -337,37 +304,32 @@ process KLEBORATE {
 
 workflow {
 
-        //Check fastq-files
-        //LOADFASTQ(fastq_list_ch)
+        //MAKE VERSIONS.TXT
+        VERSIONS()
 
-        //RUN TRIM_GALORE (or not)
+        //FASTQ-INPUT CHECK
+        LOADFASTQ(reads_ch)
+
+        //RUN TRIM_GALORE
         if ( params.trim ) {
                 
                 TRIMMING(reads_ch)
                 trimmed_ch = TRIMMING.out.trimmed_files
         }
+        //SKIP TRIM_GALORE
         else {
                 trimmed_ch = reads_ch
         }
 
-        //RUN UNICYCLER
-        ASSEMBLY(trimmed_ch)
-        assembly_ch = ASSEMBLY.out.fasta_files
-
-        //RUN POLYPOLISH
-        assembly_trimmed_ch = trimmed_ch.combine(assembly_ch, by: 0)
-
-
-        if ( params.polypolish ) {
-                polypolished_ch = POLYPOLISH(assembly_trimmed_ch)
-                
+        //RUN UNICYCLER048
+        if (params.unicycler048) {
+                UNICYCLER048(trimmed_ch)
+                assembly_ch = UNICYCLER048.out.fasta_files
         }
-
-        //RUN POLCA
-        polypolished_trimmed_ch = trimmed_ch.combine(polypolished_ch, by: 0)
-
-        if ( params.polca ) {
-                polca_ch = POLCA(polypolished_trimmed_ch)
+        //RUN NEWEST UNICYCLER
+        else {
+                ASSEMBLY(trimmed_ch)
+                assembly_ch = ASSEMBLY.out.fasta_files
         }
 
         //MAKE LIST OF FASTQ FOR FAST_COUNT
@@ -405,4 +367,6 @@ workflow {
 
         //KLEBORATE
         KLEBORATE(assembly_ch.map { it.drop(1)}.collect())
+
+        
 }

@@ -27,7 +27,7 @@ quast_df.rename(columns={'# contigs (>= 0 bp)':'#contigs'}, inplace=True)
 quast_df.rename(columns={'Total length (>= 0 bp)':'Total_length'}, inplace=True)
 quast_df.rename(columns={'Largest contig':'Largest_contig'}, inplace=True)
 quast_df.rename(columns={'GC (%)':'GC(%)'}, inplace=True)
-quast_df_sub = quast_df[['Assembly', '#contigs','GC (%)','N50', 'L50', 'Total_length', 'Largest contig']]
+quast_df_sub = quast_df[['Assembly', '#contigs','GC(%)','N50', 'L50', 'Total_length', 'Largest_contig']]
 
 #MERGE MLST WITH QUAST
 mlst_quast = pd.merge(mlst_df_sub, quast_df_sub, on='Assembly', how='outer')
