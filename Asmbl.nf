@@ -1,5 +1,9 @@
 nextflow.enable.dsl=2
 
+
+//To create an execution report with cpu usage ++: nextflow run Asmbl-nf -with-report filename.html
+
+
 //READS-CHANNEL + CHECK IF ANY READS
 reads_ch = Channel
         .fromFilePairs([params.reads_type1, params.reads_type2], flat: true, size: -1).ifEmpty {
