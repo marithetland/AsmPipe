@@ -1,30 +1,37 @@
 nextflow.enable.dsl=2
 
-
+//READS-CHANNEL + CHECK IF ANY READS
 reads_ch = Channel
-        .fromFilePairs([params.reads_type1, params.reads_type2], flat: true)
+        .fromFilePairs([params.reads_type1, params.reads_type2], flat: true, size: -1).ifEmpty {
+        exit 1, "ERROR: did not find any read files with './*.fastq'"
+        }
 
-//Check if empty
-//Check if fastq format
-//Check if reads1 and reads2
+
+//CHECK IF BOTH READ1 AND READ2 ARE PROVIDED
+reads_check_ch = reads_ch.map {
+        if (it.size() != 3) {
+                exit 1, "ERROR, didnt get exactly two readsets prefixed with ${it[0]}"
+        }
+        }
+
 //Because of any(): True if any record, False if empty.
 //Change to all(): False if any false record, True if empty.
-//With or without handle?
+
 process LOADFASTQ {
 
         input:
         tuple val(sample_id), path(reads1), path(reads2)
 
         output:
+        stdout
 
         script:
         """
-        check_fastq.py $reads1
-        check_fastq.py $reads2
+        check_fastq.py --fastq $reads1
+        check_fastq.py --fastq $reads2
         """
 }
-
-//This will now always give new unicycler in file...
+//add if unicycler048 and if unicycler050
 //VERSION.TXT
 process VERSIONS {
         
@@ -49,12 +56,10 @@ process VERSIONS {
 }
 
 
-
 //TRIM_GALORE
 process	TRIMMING {
 
         errorStrategy "${params.failure_action}"
-
         publishDir path:("trimmed_reads"), mode: 'copy', pattern: '*fq.gz'
         publishDir path:("logs/trim_galore"), mode: 'copy', pattern: '*_trimming_report.txt'
 
@@ -74,10 +79,18 @@ process	TRIMMING {
 
 
 //UNICYCLER
+
+//Only one unicycler-process
+//In script: if (params.unicycler048) {
+//$params.path/to/unicycler048 -1 $reads1.......
+//else if (params.unicycler050) {
+//$params.path/to/unicycler048 -1 $reads1.......
+//else {
+//exit 1, "ERROR"}
+//(Conditional scripts, under processes)
 process ASSEMBLY {
 
         errorStrategy "${params.failure_action}"
-
         publishDir path:("fasta"), mode: 'copy', pattern: '*.fasta'
         publishDir path:("gfa_unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: '*.gfa'
         publishDir path:("logs/unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_unicycler.log"}, pattern: 'unicycler/unicycler.log'
@@ -104,7 +117,6 @@ process ASSEMBLY {
 process UNICYCLER048 {
 
         errorStrategy "${params.failure_action}"
-
         conda "$params.unicycler048_env"
 
         publishDir path:("fasta"), mode: 'copy', pattern: '*.fasta'
@@ -122,7 +134,7 @@ process UNICYCLER048 {
 
         script:
         """
-        unicycler -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
+        unicycler -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter --spades_path 
         mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
         mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
         """
@@ -260,7 +272,7 @@ process RMLST {
 
         script:
         """
-        python ~/Programs/rMLST/rmlst_script.py -f $fasta >> rMLST.tsv
+        rmlst_script.py -f $fasta >> rMLST.tsv
         """
 
 }
@@ -276,11 +288,9 @@ process KMERFINDER {
         output:
         path("output/results.txt")
 
-        //Change -db and -tax to a parameter in config file
-        //This program only accept one 
         script:
         """
-        kmerfinder.py -i $fasta -db ~/Programs/kmerfinder_db/bacteria/bacteria.ATG -tax ~/Programs/kmerfinder_db/bacteria/bacteria.tax
+        kmerfinder.py -i $fasta -db $params.ATG -tax $params.tax
         """
 }
 
@@ -322,7 +332,7 @@ workflow {
         }
 
         //RUN UNICYCLER048
-        if (params.unicycler048) {
+        if ( params.unicycler048 ) {
                 UNICYCLER048(trimmed_ch)
                 assembly_ch = UNICYCLER048.out.fasta_files
         }
@@ -339,7 +349,7 @@ workflow {
 
         
         
-        //MAKE LIST OF VAL-FASTQ FOR FASTQC
+        //MAKE LIST OF TRIMMED FASTQ FOR FASTQC
         trimmed_list_ch = trimmed_ch.map { it.drop(1) }.collect()
         //RUN FASTQC
         fastqc_ch = FASTQC(trimmed_list_ch)
@@ -347,7 +357,6 @@ workflow {
         MULTIQC(fastqc_ch)
         multiqc_report = MULTIQC.out.report
 
-        
         //RUN QUAST
         QUAST(assembly_ch.map { it.drop(1)}.collect())
         quast_report = QUAST.out.rep
@@ -360,13 +369,18 @@ workflow {
         PANDAS(report_ch)
 
         //rMLST
-        RMLST(assembly_ch.map { it.drop(1)}.collect())
+        if ( params.rmlst ) {
+                RMLST(assembly_ch.map { it.drop(1)}.collect())
+        }
 
         //KMERFINDER
-        KMERFINDER(assembly_ch)
+        if ( params.kmerfinder ) {
+                KMERFINDER(assembly_ch)
+        }
+        
 
         //KLEBORATE
-        KLEBORATE(assembly_ch.map { it.drop(1)}.collect())
-
-        
+        if ( params.kleborate ) {
+                KLEBORATE(assembly_ch.map { it.drop(1)}.collect())
+        }
 }
