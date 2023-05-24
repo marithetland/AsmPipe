@@ -11,14 +11,10 @@ parser.add_argument('--quast', type=str, required=True, help='specify quast_tran
 parser.add_argument('--multiqc', type=str, required=True, help='specify multiqc_fastqc.txt')
 args = parser.parse_args()
 
-#How to get rid of 0,1,2..... in column1?
-#Is it necessary?
-
 #MLST
 mlst_file = pd.read_csv(args.mlst, sep='\t', header=None, names=list(['Assembly','species', 'ST', 'al1','al2','al3','al4','al5','al6','al7']))
 mlst_df = mlst_file.replace("_assembly.fasta","", regex=True)
 mlst_df_sub = mlst_df[['Assembly','species','ST']]
-
 
 #QUAST
 quast_file = pd.read_csv(args.quast, sep='\t')
@@ -31,7 +27,6 @@ quast_df_sub = quast_df[['Assembly', '#contigs','GC(%)','N50', 'L50', 'Total_len
 
 #MERGE MLST WITH QUAST
 mlst_quast = pd.merge(mlst_df_sub, quast_df_sub, on='Assembly', how='outer')
-
 
 #FASTCOUNT
 fast_count_file = pd.read_csv(args.fast_count, sep='\t')
@@ -47,7 +42,6 @@ mlst_quast_fast_count = pd.merge(mlst_quast, sum_fast_count_df, on='Assembly', h
 #CALCULATE READ_DEPTH
 mlst_quast_fast_count["Read_depth"] = mlst_quast_fast_count["Read_depth"].div(mlst_quast_fast_count["Total_length"]).round(2)
 
-
 #MULTIQC-file
 multiqc_file = pd.read_csv(args.multiqc, sep='\t')
 multiqc_df = multiqc_file.replace("_[12]_val_[12]","", regex=True)
@@ -62,6 +56,3 @@ mlst_quast_fast_count_multiqc = pd.merge(mlst_quast_fast_count, multiqc_df_sub, 
 
 #MAKE FILE
 mlst_quast_fast_count_multiqc.to_csv(path_or_buf='final_report.tsv', sep="\t", index=False)
-
-
-#round for å få kun to desimaler round(summ, 2)

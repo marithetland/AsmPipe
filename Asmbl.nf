@@ -1,15 +1,10 @@
 nextflow.enable.dsl=2
 
-
-//To create an execution report with cpu usage ++: nextflow run Asmbl-nf -with-report filename.html
-
-
-//READS-CHANNEL + CHECK IF ANY READS
+//READS_CH + CHECK IF ANY READS
 reads_ch = Channel
         .fromFilePairs([params.reads_type1, params.reads_type2], flat: true, size: -1).ifEmpty {
         exit 1, "ERROR: did not find any read files with './*.fastq'"
         }
-
 
 //CHECK IF BOTH READ1 AND READ2 ARE PROVIDED
 reads_check_ch = reads_ch.map {
@@ -18,9 +13,7 @@ reads_check_ch = reads_ch.map {
         }
         }
 
-//Because of any(): True if any record, False if empty.
-//Change to all(): False if any false record, True if empty.
-
+//CHECK FILES, EMPTY OR NOT FASTQ-FORMAT
 process LOADFASTQ {
 
         input:
@@ -38,16 +31,17 @@ process LOADFASTQ {
 //add if unicycler048 and if unicycler050
 //VERSION.TXT
 process VERSIONS {
-        
         publishDir path:("QC"), mode: 'copy'
 
+        input:
+        val(unicycler)
         output:
         path("versions.txt")
 
         script:
         """
         echo "Program\tVersion" >> versions.txt
-        unicycler --version >> versions.txt
+        $unicycler --version >> versions.txt
         spades.py --version >> versions.txt
         trim_galore --version | grep version | tr -d " " | sed "s/^/trim_galore\t/g" >> versions.txt
         cutadapt --version | sed "s/^/cutadapt\t/g"  >> versions.txt
@@ -62,7 +56,6 @@ process VERSIONS {
 
 //TRIM_GALORE
 process	TRIMMING {
-
         errorStrategy "${params.failure_action}"
         publishDir path:("trimmed_reads"), mode: 'copy', pattern: '*fq.gz'
         publishDir path:("logs/trim_galore"), mode: 'copy', pattern: '*_trimming_report.txt'
@@ -83,20 +76,10 @@ process	TRIMMING {
 
 
 //UNICYCLER
-
-//Only one unicycler-process
-//In script: if (params.unicycler048) {
-//$params.path/to/unicycler048 -1 $reads1.......
-//else if (params.unicycler050) {
-//$params.path/to/unicycler048 -1 $reads1.......
-//else {
-//exit 1, "ERROR"}
-//(Conditional scripts, under processes)
 process ASSEMBLY {
-
         errorStrategy "${params.failure_action}"
         publishDir path:("fasta"), mode: 'copy', pattern: '*.fasta'
-        publishDir path:("gfa_unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: '*.gfa'
+        publishDir path:("gfa"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: '*.gfa'
         publishDir path:("logs/unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_unicycler.log"}, pattern: 'unicycler/unicycler.log'
 
         input:
@@ -107,46 +90,25 @@ process ASSEMBLY {
         path("${sample_id}_assembly.gfa")
         path("unicycler/unicycler.log")
 
-
         script:
-        """
-        unicycler -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
-        mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
-        mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
-        """
-}
-
-
-//UNICYCLER048
-process UNICYCLER048 {
-
-        errorStrategy "${params.failure_action}"
-        conda "$params.unicycler048_env"
-
-        publishDir path:("fasta"), mode: 'copy', pattern: '*.fasta'
-        publishDir path:("gfa_unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: '*.gfa'
-        publishDir path:("logs/unicycler"), mode: 'copy', saveAs: {filename -> "${sample_id}_unicycler.log"}, pattern: 'unicycler/unicycler.log'
-
-        input:
-        tuple val(sample_id), path(reads1), path(reads2)
-
-        output:
-        tuple val(sample_id), path("${sample_id}_assembly.fasta"), emit: fasta_files
-        path("${sample_id}_assembly.gfa")
-        path("unicycler/unicycler.log")
-
-
-        script:
-        """
-        unicycler -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter --spades_path 
-        mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
-        mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
-        """
+        if (params.unicycler048) {
+                """
+                ${params.unicycler048_path} -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
+                mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
+                mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
+                """
+        }
+        else {
+                """
+                ${params.unicycler050_path} -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
+                mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
+                mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
+                """
+        }
 }
 
 //FASTQC
 process FASTQC {
-        
         errorStrategy "${params.failure_action}"
 
         input:
@@ -154,7 +116,6 @@ process FASTQC {
 
         output:
         path("*fastqc.zip")
-
 
         script:
         """
@@ -164,9 +125,7 @@ process FASTQC {
 
 //MULTIQC
 process MULTIQC {
-
         errorStrategy "${params.failure_action}"
-
         publishDir path:("QC"), mode: 'copy', pattern: 'multiqc_report.html'
         publishDir path:("QC/reports"), mode: 'copy',  saveAs: {filename -> "multiqc_fastqc.txt"} ,pattern: 'multiqc_data/multiqc_fastqc.txt'
 
@@ -185,9 +144,7 @@ process MULTIQC {
 
 //FAST_COUNT
 process FASTCOUNT {
-
         errorStrategy "${params.failure_action}"
-
         publishDir path:("QC/reports"), mode: 'copy', pattern: 'fast_count.tsv'
 
         input:
@@ -205,9 +162,7 @@ process FASTCOUNT {
 
 //QUAST
 process QUAST {
-        
         errorStrategy "${params.failure_action}"
-
         publishDir path:("QC/reports"), mode: 'copy', saveAs: {filename -> "quast_transposed_report.tsv"}, pattern: 'quast_results/results*/transposed_report.tsv'
         publishDir path:("QC"), mode: 'copy', saveAs: {filename -> "quast_report.html"}, pattern: 'quast_results/results*/report.html'
 
@@ -226,9 +181,7 @@ process QUAST {
 
 //MLST
 process MLST {
-
         errorStrategy "${params.failure_action}"
-
         publishDir path:("QC/reports"), mode: 'copy'
 
         input:
@@ -246,7 +199,6 @@ process MLST {
 
 //FINAL_REPORT
 process PANDAS {
-
         errorStrategy "${params.failure_action}"
         publishDir path:("QC"), mode: 'copy'
 
@@ -256,7 +208,6 @@ process PANDAS {
         output:
         path("final_report.tsv")
 
-        //take asmbl_pandas.py in as params in config?
         script:
         """
         asmbl_pandas.py --mlst $mlst --quast $quast --multiqc $multiqc --fast_count $fast_count
@@ -264,7 +215,6 @@ process PANDAS {
 }
 
 process RMLST {
-
         errorStrategy "${params.failure_action}" 
         publishDir path:("QC/rMLST"), mode: 'copy'
 
@@ -278,11 +228,9 @@ process RMLST {
         """
         rmlst_script.py -f $fasta >> rMLST.tsv
         """
-
 }
 
 process KMERFINDER {
-
         errorStrategy "${params.failure_action}"
         publishDir path:("QC/kmerfinder"), mode: 'copy',  saveAs: {filename -> "${sample_id}_kmerfinder.csv"}
 
@@ -299,7 +247,6 @@ process KMERFINDER {
 }
 
 process KLEBORATE {
-        
         errorStrategy "${params.failure_action}"
         publishDir path:("QC/Kleborate"), mode: 'copy'
 
@@ -317,9 +264,13 @@ process KLEBORATE {
 
 
 workflow {
-
         //MAKE VERSIONS.TXT
-        VERSIONS()
+        if ( params.unicycler048 ) {
+                VERSIONS(params.unicycler048_path)
+        }
+        else {
+                VERSIONS(params.unicycler050_path)
+        }
 
         //FASTQ-INPUT CHECK
         LOADFASTQ(reads_ch)
@@ -336,24 +287,15 @@ workflow {
         }
 
         //RUN UNICYCLER048
-        if ( params.unicycler048 ) {
-                UNICYCLER048(trimmed_ch)
-                assembly_ch = UNICYCLER048.out.fasta_files
-        }
-        //RUN NEWEST UNICYCLER
-        else {
-                ASSEMBLY(trimmed_ch)
-                assembly_ch = ASSEMBLY.out.fasta_files
-        }
+        ASSEMBLY(trimmed_ch)
+        assembly_ch = ASSEMBLY.out.fasta_files
 
-        //MAKE LIST OF FASTQ FOR FAST_COUNT
+        //MAKE FASTQ_LIST FOR FAST_COUNT
         fastq_list_ch = reads_ch.map { it.drop(1) }.collect()
         //RUN FAST_COUNT
         fc_report = FASTCOUNT(fastq_list_ch)
 
-        
-        
-        //MAKE LIST OF TRIMMED FASTQ FOR FASTQC
+        //MAKE TRIMMED_LIST FOR FASTQC
         trimmed_list_ch = trimmed_ch.map { it.drop(1) }.collect()
         //RUN FASTQC
         fastqc_ch = FASTQC(trimmed_list_ch)
@@ -382,7 +324,6 @@ workflow {
                 KMERFINDER(assembly_ch)
         }
         
-
         //KLEBORATE
         if ( params.kleborate ) {
                 KLEBORATE(assembly_ch.map { it.drop(1)}.collect())

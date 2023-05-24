@@ -16,4 +16,4 @@ with open(args.fastq, 'rb') as f:
 #Check if fastq format
 with gzip.open(args.fastq, "rt") as handle:
     is_fastq = SeqIO.parse(handle, "fastq")
-    print(all(is_fastq))
+    print(all(is_fastq)) #all(): False if any false record, True if empty. any(): True if any record, False if empty.
