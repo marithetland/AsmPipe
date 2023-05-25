@@ -9,7 +9,7 @@ reads_ch = Channel
 //CHECK IF BOTH READ1 AND READ2 ARE PROVIDED
 reads_check_ch = reads_ch.map {
         if (it.size() != 3) {
-                exit 1, "ERROR, didnt get exactly two readsets prefixed with ${it[0]}"
+                exit 1, "ERROR, didnt get exactly two readsets prefixed with ${it[0]}."
         }
         }
 
@@ -20,7 +20,7 @@ process LOADFASTQ {
         tuple val(sample_id), path(reads1), path(reads2)
 
         output:
-        stdout
+        tuple val(sample_id), stdout
 
         script:
         """
@@ -28,7 +28,7 @@ process LOADFASTQ {
         check_fastq.py --fastq $reads2
         """
 }
-//add if unicycler048 and if unicycler050
+
 //VERSION.TXT
 process VERSIONS {
         publishDir path:("QC"), mode: 'copy'
@@ -53,7 +53,6 @@ process VERSIONS {
         """
 }
 
-
 //TRIM_GALORE
 process	TRIMMING {
         errorStrategy "${params.failure_action}"
@@ -73,7 +72,6 @@ process	TRIMMING {
         trim_galore --paired $reads1 $reads2
         """
 }
-
 
 //UNICYCLER
 process ASSEMBLY {
@@ -196,7 +194,6 @@ process MLST {
         """
 }
 
-
 //FINAL_REPORT
 process PANDAS {
         errorStrategy "${params.failure_action}"
@@ -273,7 +270,11 @@ workflow {
         }
 
         //FASTQ-INPUT CHECK
-        LOADFASTQ(reads_ch)
+        check_fastq_ch = LOADFASTQ(reads_ch). map {
+                if (it =~ "False") {
+                        exit 1, "ERROR, one of the reads prefixed with ${it[0]} are either empty or not fastq format."
+                }
+        }
 
         //RUN TRIM_GALORE
         if ( params.trim ) {
