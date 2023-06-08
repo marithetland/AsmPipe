@@ -1,3 +1,6 @@
+# Asmbl-nf
+ Short read assembly pipeline (nextflow)
+
 # Asmbl
 **Assembly and quality assessment of short-read Illumina data**
 
@@ -50,15 +53,12 @@ asmbl.py
 
 ## Usage
 
-You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. In addition to the default pipeline, you can also run kleborate or abricate.
+You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. In addition to the default pipeline, you can also run kleborate, kmerfinder and rmlst.
 
 Usage:
 
 ```
-ASMBL [-h] [-v] [-t THREADS] [--noex] [--nofqc] [--nomlst]
-               [--noquast] [--nocov] [--klebs] [--argannot] [--resfinder]
-               [--plasmidfinder] [--card] [--ncbi] [--ecoh] [--abricate_all]
-
+ASMBL [-h] [-v] [--threads THREADS] [--unicycler048] [--trim] [--kleborate]
 ASMBL
 
 optional arguments:
@@ -66,13 +66,7 @@ optional arguments:
   -v, --version         show program's version number and exit
   -t THREADS, --threads THREADS
                         Specify number of threads to use. Default: 4
-  --noex                Do not run fastQC, multiQC, Quast, MLST or
-                        read depth calculation.
-  --nofqc               Do not run fastQC and multiQC
-  --nomlst              Do not run MLST
-  --noquast             Do not run Quast
-  --nocov               Do not calculate read depth (X)
-  --klebs               Run Kleborate, with option --all
+  --kleborate               Run Kleborate, with option --all
 
 ```
 
@@ -129,4 +123,3 @@ Things to check QC-wise
 2019-10-29: Added options to run ABRICATE as part of the pipeline, and created output-folder "analyses" to put mlst, kleborate and ABRICATE-outputs in. Also added merge_runs.sh which you can use to merge two parent folders with the same structure (from this script). 
 
 2019-10-30: Updated tool versions in README.
-

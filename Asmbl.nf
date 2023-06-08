@@ -3,11 +3,11 @@ nextflow.enable.dsl=2
 //READS_CH + CHECK IF ANY READS
 reads_ch = Channel
         .fromFilePairs([params.reads_type1, params.reads_type2], flat: true, size: -1).ifEmpty {
-        exit 1, "ERROR: did not find any read files with './*.fastq'"
+        exit 1, "ERROR: did not find any read files with ${params.reads_type1} or ${params.reads_type2}."
         }
 
 //CHECK IF BOTH READ1 AND READ2 ARE PROVIDED
-reads_check_ch = reads_ch.map {
+paired_reads_check_ch = reads_ch.map {
         if (it.size() != 3) {
                 exit 1, "ERROR, didnt get exactly two readsets prefixed with ${it[0]}."
         }
@@ -91,14 +91,14 @@ process ASSEMBLY {
         script:
         if (params.unicycler048) {
                 """
-                ${params.unicycler048_path} -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
+                $params.unicycler048_path -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
                 mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
                 mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
                 """
         }
         else {
                 """
-                ${params.unicycler050_path} -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
+                $params.unicycler050_path -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
                 mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
                 mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
                 """
@@ -195,7 +195,7 @@ process MLST {
 }
 
 //FINAL_REPORT
-process PANDAS {
+process FINAL_REPORT {
         errorStrategy "${params.failure_action}"
         publishDir path:("QC"), mode: 'copy'
 
@@ -259,7 +259,6 @@ process KLEBORATE {
         """
 }
 
-
 workflow {
         //MAKE VERSIONS.TXT
         if ( params.unicycler048 ) {
@@ -272,13 +271,17 @@ workflow {
         //FASTQ-INPUT CHECK
         check_fastq_ch = LOADFASTQ(reads_ch). map {
                 if (it =~ "False") {
-                        exit 1, "ERROR, one of the reads prefixed with ${it[0]} are either empty or not fastq format."
+                        exit 1, "ERROR, one of the fastq files prefixed with ${it[0]} is not in accordance with fastq format (either corrupt or empty)."
                 }
         }
 
+        //MAKE FASTQ_LIST FOR FAST_COUNT
+        fastq_list_ch = reads_ch.map { it.drop(1) }.collect()
+        //RUN FAST_COUNT
+        fc_report = FASTCOUNT(fastq_list_ch)
+
         //RUN TRIM_GALORE
         if ( params.trim ) {
-                
                 TRIMMING(reads_ch)
                 trimmed_ch = TRIMMING.out.trimmed_files
         }
@@ -287,14 +290,9 @@ workflow {
                 trimmed_ch = reads_ch
         }
 
-        //RUN UNICYCLER048
+        //RUN UNICYCLER
         ASSEMBLY(trimmed_ch)
         assembly_ch = ASSEMBLY.out.fasta_files
-
-        //MAKE FASTQ_LIST FOR FAST_COUNT
-        fastq_list_ch = reads_ch.map { it.drop(1) }.collect()
-        //RUN FAST_COUNT
-        fc_report = FASTCOUNT(fastq_list_ch)
 
         //MAKE TRIMMED_LIST FOR FASTQC
         trimmed_list_ch = trimmed_ch.map { it.drop(1) }.collect()
@@ -311,9 +309,9 @@ workflow {
         //RUN MLST
         mlst_report = MLST(assembly_ch.map { it.drop(1)}.collect())
 
-        //RUN PANDAS
+        //MAKE FINAL REPORT
         report_ch = mlst_report.concat( quast_report, multiqc_report, fc_report ).collect()
-        PANDAS(report_ch)
+        FINAL_REPORT(report_ch)
 
         //rMLST
         if ( params.rmlst ) {
