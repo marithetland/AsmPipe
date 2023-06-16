@@ -1,5 +1,5 @@
 
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Upload contigs file to PubMLST rMLST species identifier via RESTful API
 # Written by Keith Jolley

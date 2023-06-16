@@ -286,7 +286,7 @@ process KLEBORATE {
 
 workflow {
         
-        RENAME(reads_ch)
+        fastq_ch = RENAME(reads_ch)
 
         //MAKE VERSIONS.TXT
         if ( params.unicycler048 ) {
@@ -304,18 +304,18 @@ workflow {
         }
 
         //MAKE FASTQ_LIST FOR FAST_COUNT
-        fastq_list_ch = reads_ch.map { it.drop(1) }.collect()
+        fastq_list_ch = fastq_ch.map { it.drop(1) }.collect()
         //RUN FAST_COUNT
         fc_report = FASTCOUNT(fastq_list_ch)
 
         //RUN TRIM_GALORE
         if ( params.trim ) {
-                TRIMMING(reads_ch)
+                TRIMMING(fastq_ch)
                 trimmed_ch = TRIMMING.out.trimmed_files
         }
         //SKIP TRIM_GALORE
         else {
-                trimmed_ch = reads_ch
+                trimmed_ch = fastq_ch
         }
 
         //RUN UNICYCLER
