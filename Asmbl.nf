@@ -31,7 +31,7 @@ process LOADFASTQ {
 
 //VERSION.TXT
 process VERSIONS {
-        publishDir path:("QC"), mode: 'copy'
+        publishDir path:("reports"), mode: 'copy'
 
         input:
         val(unicycler)
@@ -53,6 +53,31 @@ process VERSIONS {
         """
 }
 
+//RENAME
+process RENAME {
+        publishDir path:("fastq"), mode: 'copy'
+        input:
+        tuple val(sample_id), path(reads1), path(reads2)
+
+        output:
+        tuple val(sample_id), path("${sample_id}_1.fastq.gz"), path("${sample_id}_2.fastq.gz")
+
+        script:
+        if ("$reads1" != "${sample_id}_1.fastq.gz"){
+                """
+                mv $reads1 ${sample_id}_1.fastq.gz
+                mv $reads2 ${sample_id}_2.fastq.gz
+                """
+        }
+        else {
+                """
+                echo $reads1
+                echo $reads2
+                """
+        }
+
+}
+
 //TRIM_GALORE
 process	TRIMMING {
         errorStrategy "${params.failure_action}"
@@ -69,7 +94,7 @@ process	TRIMMING {
 
         script:
         """
-        trim_galore --paired $reads1 $reads2
+        trim_galore --paired $reads1 $reads2 --cores 4
         """
 }
 
@@ -91,7 +116,7 @@ process ASSEMBLY {
         script:
         if (params.unicycler048) {
                 """
-                $params.unicycler048_path -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
+                $params.unicycler048_path -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter --pilon_path $params.unicycler048_path
                 mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
                 mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
                 """
@@ -124,8 +149,8 @@ process FASTQC {
 //MULTIQC
 process MULTIQC {
         errorStrategy "${params.failure_action}"
-        publishDir path:("QC"), mode: 'copy', pattern: 'multiqc_report.html'
-        publishDir path:("QC/reports"), mode: 'copy',  saveAs: {filename -> "multiqc_fastqc.txt"} ,pattern: 'multiqc_data/multiqc_fastqc.txt'
+        publishDir path:("reports"), mode: 'copy', pattern: 'multiqc_report.html'
+        publishDir path:("reports/extra"), mode: 'copy',  saveAs: {filename -> "multiqc_fastqc.txt"} ,pattern: 'multiqc_data/multiqc_fastqc.txt'
 
         input:
         path(fastqc_files)
@@ -143,7 +168,7 @@ process MULTIQC {
 //FAST_COUNT
 process FASTCOUNT {
         errorStrategy "${params.failure_action}"
-        publishDir path:("QC/reports"), mode: 'copy', pattern: 'fast_count.tsv'
+        publishDir path:("reports/extra"), mode: 'copy', pattern: 'fast_count.tsv'
 
         input:
         path(rawreads)
@@ -161,8 +186,8 @@ process FASTCOUNT {
 //QUAST
 process QUAST {
         errorStrategy "${params.failure_action}"
-        publishDir path:("QC/reports"), mode: 'copy', saveAs: {filename -> "quast_transposed_report.tsv"}, pattern: 'quast_results/results*/transposed_report.tsv'
-        publishDir path:("QC"), mode: 'copy', saveAs: {filename -> "quast_report.html"}, pattern: 'quast_results/results*/report.html'
+        publishDir path:("reports/extra"), mode: 'copy', saveAs: {filename -> "quast_transposed_report.tsv"}, pattern: 'quast_results/results*/transposed_report.tsv'
+        publishDir path:("reports"), mode: 'copy', saveAs: {filename -> "quast_report.html"}, pattern: 'quast_results/results*/report.html'
 
         input:
         path(fasta)
@@ -180,7 +205,7 @@ process QUAST {
 //MLST
 process MLST {
         errorStrategy "${params.failure_action}"
-        publishDir path:("QC/reports"), mode: 'copy'
+        publishDir path:("reports/extra"), mode: 'copy'
 
         input:
         path(fasta)
@@ -197,7 +222,7 @@ process MLST {
 //FINAL_REPORT
 process FINAL_REPORT {
         errorStrategy "${params.failure_action}"
-        publishDir path:("QC"), mode: 'copy'
+        publishDir path:("reports"), mode: 'copy'
 
         input:
         tuple path(mlst), path(quast), path(multiqc), path(fast_count)
@@ -213,7 +238,7 @@ process FINAL_REPORT {
 
 process RMLST {
         errorStrategy "${params.failure_action}" 
-        publishDir path:("QC/rMLST"), mode: 'copy'
+        publishDir path:("reports/rMLST"), mode: 'copy'
 
         input:
         path(fasta)
@@ -229,7 +254,7 @@ process RMLST {
 
 process KMERFINDER {
         errorStrategy "${params.failure_action}"
-        publishDir path:("QC/kmerfinder"), mode: 'copy',  saveAs: {filename -> "${sample_id}_kmerfinder.csv"}
+        publishDir path:("reports/kmerfinder"), mode: 'copy',  saveAs: {filename -> "${sample_id}_kmerfinder.csv"}
 
         input:
         tuple val(sample_id), path(fasta)
@@ -245,7 +270,7 @@ process KMERFINDER {
 
 process KLEBORATE {
         errorStrategy "${params.failure_action}"
-        publishDir path:("QC/Kleborate"), mode: 'copy'
+        publishDir path:("reports/Kleborate"), mode: 'copy'
 
         input:
         path(fasta)
@@ -260,6 +285,9 @@ process KLEBORATE {
 }
 
 workflow {
+        
+        RENAME(reads_ch)
+
         //MAKE VERSIONS.TXT
         if ( params.unicycler048 ) {
                 VERSIONS(params.unicycler048_path)
