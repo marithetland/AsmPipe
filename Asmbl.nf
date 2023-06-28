@@ -100,6 +100,7 @@ process	TRIMMING {
 
 //UNICYCLER
 process ASSEMBLY {
+        maxForks = "${params.maxForks}"
         errorStrategy "${params.failure_action}"
         publishDir path:("fasta"), mode: 'copy', pattern: '*.fasta'
         publishDir path:("gfa"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: '*.gfa'
