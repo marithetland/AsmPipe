@@ -1,5 +1,10 @@
 nextflow.enable.dsl=2
 
+//Legge inn i oppskriften:
+//nextflow run asmbl ; rm ./fastq.gz ; deldir
+//evt denne kommandoen er kanskje bedre,gjør denne at rm ./fastq.gz ikke vil kjøres om nextflow run ikke går gjennom?
+//nextflow run asmbl | rm ./fastq.gz | deldir
+
 //READS_CH + CHECK IF ANY READS
 reads_ch = Channel
         .fromFilePairs([params.reads_type1, params.reads_type2], flat: true, size: -1).ifEmpty {
@@ -50,6 +55,7 @@ process VERSIONS {
         mlst --version >> versions.txt
         quast.py --version >> versions.txt
         kleborate --version >> versions.txt
+        if [ $params.unicycler048 == true ] ; then $params.pilon_version_path --version >> versions.txt ; fi
         """
 }
 
@@ -117,7 +123,7 @@ process ASSEMBLY {
         script:
         if (params.unicycler048) {
                 """
-                $params.unicycler048_path -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter --pilon_path $params.unicycler048_path
+                $params.unicycler048_path -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter --pilon_path $params.pilon_uni048_path
                 mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
                 mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
                 """
