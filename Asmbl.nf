@@ -58,7 +58,7 @@ process VERSIONS {
         if [ $params.unicycler048 == true ] ; then $params.pilon_version_path --version >> versions.txt ; fi
         """
 }
-
+//TODO: kan gjøre denne penere ved å bruke alias. Også ta bort S-posisjon...
 //RENAME
 process RENAME {
         publishDir path:("fastq"), mode: 'copy'
@@ -86,6 +86,7 @@ process RENAME {
 
 //TRIM_GALORE
 process	TRIMMING {
+        maxForks = "${params.maxForksTrimming}"
         errorStrategy "${params.failure_action}"
         publishDir path:("trimmed_reads"), mode: 'copy', pattern: '*fq.gz'
         publishDir path:("logs/trim_galore"), mode: 'copy', pattern: '*_trimming_report.txt'
@@ -106,7 +107,7 @@ process	TRIMMING {
 
 //UNICYCLER
 process ASSEMBLY {
-        maxForks = "${params.maxForks}"
+        maxForks = "${params.maxForksAssembly}"
         errorStrategy "${params.failure_action}"
         publishDir path:("fasta"), mode: 'copy', pattern: '*.fasta'
         publishDir path:("gfa"), mode: 'copy', saveAs: {filename -> "${sample_id}_assembly.gfa"}, pattern: '*.gfa'
