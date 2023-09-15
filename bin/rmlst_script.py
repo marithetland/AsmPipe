@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 
 # Upload contigs file to PubMLST rMLST species identifier via RESTful API
