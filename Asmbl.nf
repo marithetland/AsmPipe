@@ -38,16 +38,14 @@ process LOADFASTQ {
 process VERSIONS {
         publishDir path:("reports"), mode: 'copy'
 
-        input:
-        val(unicycler)
         output:
         path("versions.txt")
 
         script:
         """
         echo "Program\tVersion" >> versions.txt
-        $unicycler --version >> versions.txt
-        spades.py --version >> versions.txt
+        if [ $params.unicycler048 == true ]; then ${params.unicycler048_path}unicycler --version >> versions.txt ; elif [ $params.unicycler050 == true ]; then unicycler --version >> versions.txt ; fi
+        if [ $params.unicycler048 == true ]; then ${params.unicycler048_path}spades.py --version >> versions.txt ; else spades.py --version >> versions.txt ; fi
         trim_galore --version | grep version | tr -d " " | sed "s/^/trim_galore\t/g" >> versions.txt
         cutadapt --version | sed "s/^/cutadapt\t/g"  >> versions.txt
         fastqc --version >> versions.txt
@@ -55,7 +53,7 @@ process VERSIONS {
         mlst --version >> versions.txt
         quast.py --version >> versions.txt
         kleborate --version >> versions.txt
-        if [ $params.unicycler048 == true ] ; then $params.pilon_version_path --version >> versions.txt ; fi
+        if [ $params.unicycler048 == true ] ; then $params.pilon_version_path --version | cut -d' ' -f1-3 >> versions.txt ; fi
         """
 }
 //TODO: kan gjøre denne penere ved å bruke alias. Også ta bort S-posisjon...
@@ -136,6 +134,31 @@ process ASSEMBLY {
                 mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
                 """
         }
+}
+
+//SPADES
+process SPADES {
+        maxForks = "${params.maxForksAssembly}"
+        errorStrategy "${params.failure_action}"
+        publishDir path:("fasta"), mode: 'copy', pattern: '*.fasta'
+        publishDir path:("gfa"), mode: 'copy', pattern: '*.gfa'
+        publishDir path:("logs/spades"), mode: 'copy', saveAs: {filename -> "${sample_id}_spades.log"}, pattern: 'spades/spades.log'
+
+        input:
+        tuple val(sample_id), path(reads1), path(reads2)
+
+        output:
+        tuple val(sample_id), path("${sample_id}_assembly.fasta"), emit: fasta_files
+        path("${sample_id}_assembly.gfa")
+        path("spades/spades.log")
+
+        script:
+        """
+        spades.py -o spades --isolate -1 $reads1 -2 $reads2 --threads 8
+        mv spades/contigs.fasta ${sample_id}_assembly.fasta
+        mv spades/*simplification.gfa ${sample_id}_assembly.gfa
+        """
+
 }
 
 //FASTQC
@@ -297,12 +320,7 @@ workflow {
         fastq_ch = RENAME(reads_ch)
 
         //MAKE VERSIONS.TXT
-        if ( params.unicycler048 ) {
-                VERSIONS(params.unicycler048_path)
-        }
-        else {
-                VERSIONS(params.unicycler050_path)
-        }
+        VERSIONS()
 
         //FASTQ-INPUT CHECK
         check_fastq_ch = LOADFASTQ(reads_ch). map {
@@ -327,8 +345,15 @@ workflow {
         }
 
         //RUN UNICYCLER
-        ASSEMBLY(trimmed_ch)
-        assembly_ch = ASSEMBLY.out.fasta_files
+        if (params.unicycler048 | params.unicycler050) {
+                ASSEMBLY(trimmed_ch)
+                assembly_ch = ASSEMBLY.out.fasta_files
+        }
+        else {
+                SPADES(trimmed_ch)
+                assembly_ch = SPADES.out.fasta_files
+        }
+
 
         //MAKE TRIMMED_LIST FOR FASTQC
         trimmed_list_ch = trimmed_ch.map { it.drop(1) }.collect()
