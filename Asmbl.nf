@@ -122,14 +122,14 @@ process ASSEMBLY {
         script:
         if (params.unicycler048) {
                 """
-                $params.unicycler048_path -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter --pilon_path $params.pilon_uni048_path
+                ${params.unicycler048_path}unicycler -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter --pilon_path $params.pilon_uni048_path
                 mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
                 mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
                 """
         }
         else {
                 """
-                $params.unicycler050_path -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
+                unicycler -1 $reads1 -2 $reads2 -o unicycler --verbosity 2 --keep 2 --depth_filter $params.depth_filter
                 mv unicycler/assembly.fasta ${sample_id}_assembly.fasta
                 mv unicycler/assembly.gfa ${sample_id}_assembly.gfa
                 """
