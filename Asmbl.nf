@@ -20,7 +20,9 @@ paired_reads_check_ch = reads_ch.map {
 
 //CHECK FILES, EMPTY OR NOT FASTQ-FORMAT
 process LOADFASTQ {
-
+        //afterscript here?
+        //afterScript 'rm ${sample_id}*'
+        //afterScript 'rm ${sample_id}*_1.fastq.gz ${sample_id}*_2.fastq.gz'
         input:
         tuple val(sample_id), path(reads1), path(reads2)
 
@@ -295,9 +297,10 @@ process KMERFINDER {
 
         script:
         """
-        kmerfinder.py -i $fasta -db $params.ATG -tax $params.tax
+        kmerfinder.py -i $fasta -db ${params.kmerfinder_db}bacteria.ATG -tax ${params.kmerfinder_db}bacteria.tax
         """
 }
+
 
 process KLEBORATE {
         errorStrategy "${params.failure_action}"
