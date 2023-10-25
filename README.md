@@ -12,8 +12,7 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 
 ## Table of Contents
 
-[Requirements](#Requirements)  
-[Basic Usage](#Basic-usage)  
+[Installation](#Installation)   
 [Usage](#Usage)  
 [Output](#Output)  
 [Detailed Explanation](#Detailed-explanation)  
@@ -23,14 +22,12 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 ## Installation
 
 ```
-mamba create -n asmbl_env -c bioconda -c conda-forge pandas blast fastqc multiqc trim-galore unicycler openjdk==17.0.3 biopython perl-moo mlst 
+mamba create -n asmbl_env -c bioconda -c conda-forge pandas blast fastqc multiqc trim-galore unicycler quast openjdk==17.0.3 biopython perl-moo mlst 
 ```
-quast (?) conda eller github?
-picard (?)
 
 Optional:
 
-kleborate: 
+Kleborate: 
 ```
 git clone --recursive https://github.com/katholt/Kleborate.git
 cd Kleborate/kaptive
@@ -42,7 +39,7 @@ kmerfinder:
 mamba install -c bioconda kmerfinder 
 ```
 
-kmerfinder db:
+KmerFinder db:
 ```
 wget https://cge.food.dtu.dk/services/KmerFinder/etc/kmerfinder_db.tar.gz
 tar -xvf kmerfinder_db.tar.gz README.md VALIDATE.py bacteria bacteria.md5 config
@@ -53,8 +50,8 @@ There are several options that can be set by modifying the nextflow.config file:
 
 | Option                            | Description                                                       | Default                    |
 | ----                              | ----                                                              | ----                       |
-| `unicycler050`                    | Run Unicycler v0.5.0 instead of SPAdes (true/false)               | false                      |
-| `unicycler048`                    | Run Unicycler v0.4.8 instead of SPAdes (true/false)               | false                      |
+| `unicycler050`                    | Run Unicycler v0.5.0 for assembly (true/false)                    | false                      |
+| `unicycler048`                    | Run Unicycler v0.4.8 for assembly (true/false)                    | false                      |
 | `unicycler048_path`               | Specify the path to Unicycler v0.4.8                              |                            |
 | `pilon_uni048_path`               | Specify the path to pilon.jar                                     |                            |
 | `pilon_version_path`              | Specify the path to pilon                                         |                            |
@@ -63,33 +60,22 @@ There are several options that can be set by modifying the nextflow.config file:
 | `kleborate`                       | Run Kleborate (true/false)                                        | false                      |
 | `reads_type1`                     | Specify input reads type 1                                        | ./*L001_R{1,2}_001.fastq.gz|
 | `reads_type2`                     | Specify input reads type 2                                        | ./*_{1,2}.fastq.gz         |
-| `failure_action`                  | Specifiy the nextflow error strategy (terminate/ignore/finish)    | ignore                     |
+| `failure_action`                  | Specify the nextflow error strategy (terminate/ignore/finish)     | ignore                     |
 | `rmlst`                           | Run rMLST (true/false)                                            | false                      |
 | `kmerfinder`                      | Run KmerFinder (true/false)                                       | false                      |
 | `kmerfinder_db`                   | Specify the path to kmerfinder_db/bacteria/                       |                            |
-| `fast`                            | Use 72 threads instead of 36 (true/false)                         | false                      |
+| `fast`                            | Run with 72 threads rather than 36 (true/false)                   | false                      |
 
 
-## Basic usage
+## Usage
 
-You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory.
+You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. In addition to the default pipeline, you can also run Kleborate, KmerFinder and rMLST.
 
 ``` 
 cd ~/Directory_with_fastq/  #Enter directory with FASTQ-files
 conda activate asmbl_env    #Activate conda environment
 nextflow run Asmbl.nf       #Run the pipeline
 ```
-
-## Usage
-
-You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. In addition to the default pipeline, you can also run Kleborate, KmerFinder and rMLST.
-
-Usage:
-
-
-
-You can add more FASTQ-files to the same output-directories/summary-report, by adding the FASTQ-files to the inital input-directory, leaving the output-folder structure as it was created and re-running the pipeline using -resume.
-
  
 
 ## Output
@@ -102,19 +88,18 @@ The following output-files are created when running AsmPipe:
 * gfa: The GFA-file from assembly will be placed here
 * reports: Contains reports from FastQC, MultiQC, Quast, mlst, fast_count, Kleborate, rMLST and KmerFinder. Also contains an overall summary
   report of: Species, ST, no. reads, GC%, no. contigs, largest contig, total sequence length, N50, L50 and sequence depth.
-trimming and overall coverage calculation
 * logs: Contains run-logs from Trim Galore and SPAdes (or Unicycler).
  
-
 
 ## Detailed explanation
 
 * FastQC performs quality assessment of raw reads, indicating number of reads, GC%, adapter content, sequence length distribution, and more
 * Trim Galore - trims raw reads based on adapter sequences and Phred quality: trims 1 bp off 3' end of every read, removes low-quality (<Phred 20) 3' ends, removes adapter sequences and removes read-pairs if either of the reads' length is <20 bp
-* Unicycler functions as a SPAdes optimiser with short-reads only, and pilon polishing attempts to make imporvements on the genome
+* SPAdes is a short-read genome assembler. Unicycler functions as a SPAdes optimiser with short-reads only. Unicycler v0.4.8 uses pilon polishing to attempt to make improvements on the genome
 * Quast quality assessment on assembly outputs the total length, GC%, number of contigs, N50, L50 and more. 
 * mlst attempts to identify species and MLST based on the PubMLST schemes. Other tools may be needed for specification, e.g. Kleborate identifies locus variants for Klebsiella samples and separates klebsiella pneumoniae sensu lato into subspecies
-* Sequencing depth (X) - maps the reads against their assembled fasta-file to calculate the overall average depth of the genome.
+* The overall average depth of the genome is calculated based on total length in bp from fast_count and total_length from quast.
+
 
 Things to check QC-wise
 * That GC% matches the sample species
@@ -123,11 +108,8 @@ Things to check QC-wise
 * That you do not have low average read depth (ideally >40X)
 * A low number of long contigs is preferable to a high number of contigs with short contigs
 
-## License
-[GNU General Public License, v3](https://www.gnu.org/licenses/gpl-3.0.html)
-
 ## Updates
-2023-10-xx: Updated the pipeline to nextflow pipeline. SPAdes is now the default assembler. Added option to run KmerFinder and rMLST. Switched out bwa with fastcount for read depth calculation. 
+2023-10-25: Updated the pipeline to nextflow pipeline. SPAdes is now the default assembler. Added option to run KmerFinder and rMLST. Switched out bwa with fast_count for read depth calculation. 
 
 2022-02-03: Updated pipeline to work with newest release of Unicycler (v0.5.0). Unicycler no longer uses pilon for polishing and read error correction is by default turned off, so these options have been removed from the pipeline. Also removed option for abricate as it does not work. Also updated some terms to stop confusion: The folder "assemblies" is now "fasta", "coverage" is now "read depth", and the final report from the pipeline is prefixed with "Asmbl" rather than "AsmPipe".
 
