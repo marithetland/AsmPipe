@@ -21,8 +21,15 @@ The script creates a report summarising for each sample: Species, ST, no. reads,
 
 ## Installation
 
+Install conda environment and install dependencies:
+
 ```
 mamba create -n asmbl_env -c bioconda -c conda-forge pandas blast fastqc multiqc trim-galore unicycler quast openjdk==17.0.3 biopython perl-moo mlst 
+```
+
+Clone the github repo and set up:
+```
+git clone https://github.com/marithetland/Asmbl.git
 ```
 
 Optional:
@@ -46,6 +53,17 @@ tar -xvf kmerfinder_db.tar.gz README.md VALIDATE.py bacteria bacteria.md5 config
 rm kmerfinder_db.tar.gz
 ```
 
+## Usage
+
+You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. In addition to the default pipeline, you can also run Kleborate, KmerFinder and rMLST.
+
+``` 
+cd ~/Directory_with_fastq/  #Enter directory with FASTQ-files
+conda activate asmbl_env    #Activate conda environment
+nextflow run Asmbl.nf       #Run the pipeline
+```
+
+
 There are several options that can be set by modifying the nextflow.config file:
 
 | Option                            | Description                                                       | Default                    |
@@ -67,16 +85,6 @@ There are several options that can be set by modifying the nextflow.config file:
 | `fast`                            | Run with 72 threads rather than 36 (true/false)                   | false                      |
 
 
-## Usage
-
-You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. In addition to the default pipeline, you can also run Kleborate, KmerFinder and rMLST.
-
-``` 
-cd ~/Directory_with_fastq/  #Enter directory with FASTQ-files
-conda activate asmbl_env    #Activate conda environment
-nextflow run Asmbl.nf       #Run the pipeline
-```
- 
 
 ## Output
 
