@@ -54,7 +54,7 @@ process VERSIONS {
         multiqc --version >> versions.txt
         mlst --version >> versions.txt
         quast.py --version >> versions.txt
-        kleborate --version >> versions.txt
+        $params.kleborate_path --version >> versions.txt
         if [ $params.unicycler048 == true ] ; then $params.pilon_version_path --version | cut -d' ' -f1-3 >> versions.txt ; fi
         """
 }
@@ -211,8 +211,8 @@ process FASTCOUNT {
 
         script:
         """
-        fast_count >> fast_count.tsv
-        fast_count $rawreads >> fast_count.tsv
+        $params.fast_count_path >> fast_count.tsv
+        $params.fast_count_path $rawreads >> fast_count.tsv
         """
 }
 
@@ -314,7 +314,7 @@ process KLEBORATE {
 
         script:
         """
-        kleborate --all -a $fasta
+        $params.kleborate_path --all -a $fasta
         """
 }
 
