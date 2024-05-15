@@ -5,6 +5,8 @@ nextflow.enable.dsl=2
 //evt denne kommandoen er kanskje bedre,gjør denne at rm ./fastq.gz ikke vil kjøres om nextflow run ikke går gjennom?
 //nextflow run asmbl | rm ./fastq.gz | deldir
 
+println "Starting Asmbl v1.0.0"
+
 //READS_CH + CHECK IF ANY READS
 reads_ch = Channel
         .fromFilePairs([params.reads_type1, params.reads_type2], flat: true, size: -1).ifEmpty {
