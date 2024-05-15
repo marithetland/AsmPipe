@@ -1,132 +1,158 @@
+# Asmbl-nf
+Short read assembly pipeline (nextflow)
+
 # Asmbl
 **Assembly and quality assessment of short-read Illumina data**
 
 Pipeline of tools used for quality assessment, assembly and gene detection from short-read Illumina sequences. Created for easy use at our microbiology research lab at Stavanger University Hopsital.
 
-This script will quality- and adapter-trim your data with trim_galore, create a FastQC report, assemble the trimmed FASTQ reads using Unicycler, create a Quast QC-report, run mlst to identify sequence types and species, and will calculate average read depth (or coverage) of each sample.
+This script will quality- and adapter-trim your data with Trim Galore, create a FastQC report, assemble the trimmed FASTQ reads using SPAdes (or Unicycler), create a Quast QC-report, run mlst to identify sequence types and species, and will calculate average read depth (or coverage) of each sample.
 
 The script creates a report summarising for each sample: Species, ST, no. reads, GC%, no. contigs, largest contig, total sequence length, N50, L50 and read depth.
 
 ## Table of Contents
 
-[Requirements](#Requirements)  
-[Basic Usage](#Basic-usage)  
+[Installation](#Installation)   
 [Usage](#Usage)  
 [Output](#Output)  
 [Detailed Explanation](#Detailed-explanation)  
 [Updates](#Updates)  
 
-## Requirements
-These need to be installed and in path for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the ones I have tested.
 
-* Linux or MacOS
-* Python 3.9.7
-* Pandas (`pip3 install pandas`)
-* Paralell (`conda install -c conda-forge parallel`)
-* FastQC v0.11.9 (https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) (`conda install -c bioconda fastqc`)
-* MultiQC v1.11 (https://multiqc.info/) (`conda install -c bioconda multiqc`)
-* CutAdapt v3.5 (for TrimGalore) (`conda install -c bioconda cutadapt`)
-* TrimGalore v0.6.7 (`conda install -c bioconda trim-galore`)
-* Unicycler v0.5.0 (https://github.com/rrwick/Unicycler#installation) 
-* SPAdes v3.15.3 (http://cab.spbu.ru/software/spades/) (`conda install -c bioconda spades`)
-* BLAST+ v2.12.0+ (`conda install -c bioconda blast`)
-* Bowtie2 v2.4.5 (`conda install -c bioconda bowtie2`)
-* Quast v5.0.2 (http://quast.sourceforge.net/quast) (`conda install -c bioconda quast`)
-* mlst v2.19.0 (https://github.com/tseemann/mlst) (`conda install -c conda-forge -c bioconda -c defaults mlst`)
-* BWA v0.7.17-r1188 (http://bio-bwa.sourceforge.net/) (`conda install -c bioconda bwa`)
-* SAMtools v1.14 (http://www.htslib.org/download/) (`conda install -c bioconda samtools`)
-* PicardTools v2.18.29-0 (https://broadinstitute.github.io/picard/) (`conda install -c bioconda picard`)
-* Optional: Kleborate v2.20 (https://github.com/katholt/Kleborate) including Kaptive v2.0.0
-* Optional but recommended: Install all in a conda environment
+## Installation
 
-## Basic usage
+Create conda environment and install dependencies:
 
-You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory.
-
-``` 
-cd ~/Directory_with_fastq/ #Enter directory with FASTQ-files
-asmbl.py 
 ```
+mamba create -n asmbl_env -c bioconda -c conda-forge pandas blast fastqc multiqc trim-galore unicycler quast openjdk==17.0.3 biopython perl-moo mlst nextflow
+```
+
+Activate the conda environment: 
+```
+conda activate asmbl_env
+```
+
+Clone the github repo and set up:
+```
+git clone https://github.com/marithetland/Asmbl.git
+```
+
+Download fast_count:
+```
+git clone https://github.com/rrwick/MinION-desktop.git
+cd MinION-desktop
+make
+cd ..
+```
+
+Optional:
+
+Kleborate: 
+```
+git clone --recursive https://github.com/katholt/Kleborate.git
+cd Kleborate/kaptive
+git pull https://github.com/katholt/Kaptive master
+cd ../..
+```
+
+Update Kleborate database:
+```
+cd Kleborate/scripts
+python3 getmlst.py --species "Klebsiella pneumoniae"
+mv Klebsiella_pneumoniae.fasta ../kleborate/data
+mv profiles_csv ../kleborate/data/kpneumoniae.txt
+rm -f ../kleborate/data/Klebsiella_pneumoniae.fasta.n*
+cd ../..
+```
+
+kmerfinder:
+```
+mamba install -c bioconda kmerfinder 
+```
+
+KmerFinder database:
+```
+wget https://cge.food.dtu.dk/services/KmerFinder/etc/kmerfinder_db.tar.gz
+tar -xvf kmerfinder_db.tar.gz README.md VALIDATE.py bacteria bacteria.md5 config
+rm kmerfinder_db.tar.gz
+```
+
+The dependencies are installed with mamba and will be found in global path. The full path to the optional tools/dbs must be specified in the `nextflow.config` file.
 
 ## Usage
 
-You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. In addition to the default pipeline, you can also run kleborate or abricate.
+You must be in the directory containing the FASTQ-files to run this pipeline. Output-files will be stored in a specific file-structure in the input-directory. The default assembler used in the pipeline is SPAdes. In addition to the default pipeline, you can also run Unicycler for assembly and run the species identification programs Kleborate, KmerFinder and rMLST.
 
-Usage:
-
-```
-ASMBL [-h] [-v] [-t THREADS] [--noex] [--nofqc] [--nomlst]
-               [--noquast] [--nocov] [--klebs] [--argannot] [--resfinder]
-               [--plasmidfinder] [--card] [--ncbi] [--ecoh] [--abricate_all]
-
-ASMBL
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -v, --version         show program's version number and exit
-  -t THREADS, --threads THREADS
-                        Specify number of threads to use. Default: 4
-  --noex                Do not run fastQC, multiQC, Quast, MLST or
-                        read depth calculation.
-  --nofqc               Do not run fastQC and multiQC
-  --nomlst              Do not run MLST
-  --noquast             Do not run Quast
-  --nocov               Do not calculate read depth (X)
-  --klebs               Run Kleborate, with option --all
-
+``` 
+cd ~/Directory_with_fastq/  #Enter directory with FASTQ-files
+conda activate asmbl_env    #Activate conda environment
+nextflow run Asmbl.nf       #Run the pipeline
 ```
 
-You can add more FASTQ-files to the same output-directories/summary-report, by adding the FASTQ-files to the inital input-directory, leaving the output-folder structure as it was created and re-running the pipeline.
 
-Note: This was initially created for scientist with little/no coding-experience to easily perform assembly, therefore, this script currently only works when you run it from the folder the FASTQ-files are in, and output-files are stored in the same directory. In the future, I will add input and output-options.
- 
+There are several options that can be set by modifying the nextflow.config file:
+
+| Option                            | Description                                                       | Default                    | Line in config-file |
+| ----                              | ----                                                              | ----                       | ----                |
+| `unicycler048_path`               | Specify the path to Unicycler v0.4.8                              |                            |    4                |
+| `pilon_uni048_path`               | Specify the path to pilon.jar                                     |                            |    5                |
+| `pilon_version_path`              | Specify the path to pilon                                         |                            |    6                |
+| `params.fast_count_path`          | Specify the path to fast_count                                    |                            |    9                |
+| `params.kleborate_path`           | Specify the path to Kleborate                                     |                            |   12                |
+| `kmerfinder_db`                   | Specify the path to kmerfinder_db/bacteria/                       |                            |   15                |
+| `trim`                            | Run Trim_galore (true/false)                                      | true                       |   24                |
+| `unicycler048`                    | Run Unicycler v0.4.8 for assembly (true/false)                    | false                      |   27                |
+| `unicycler050`                    | Run Unicycler v0.5.0 for assembly (true/false)                    | false                      |   28                |
+| `kleborate`                       | Run Kleborate (true/false)                                        | false                      |   31                |
+| `rmlst`                           | Run rMLST (true/false)                                            | false                      |   34                |
+| `kmerfinder`                      | Run KmerFinder (true/false)                                       | false                      |   35                |
+| `fast`                            | Run with 72 threads rather than 36 (true/false)                   | false                      |   45                |
+| `depth_filter`                    | Depth_filter for Unicycler (note SPAdes is default)               | 0.25                       |   64                |
+| `reads_type1`                     | Specify input reads type 1                                        | ./*L001_R{1,2}_001.fastq.gz|   67                |
+| `reads_type2`                     | Specify input reads type 2                                        | ./*_{1,2}.fastq.gz         |   68                |
+| `failure_action`                  | Specify the nextflow error strategy (terminate/ignore/finish)     | ignore                     |   71                |
 
 ## Output
 
 The following output-files are created when running AsmPipe:
 
-* Fastq_raw: Any FASTQ-files that have been processed are placed here
-* trimmed_reads: The trimmed reads from TrimGalore are placed here
-* assembly: The Unicycler-assembled files will be placed here
-* assemblies: The FASTA-file from assembly will be copied to this direcory
-* QC: Contains reports from FastQC, multiQC, Quast, trimming and overall coverage calculation
-* analyses: Contains results from mlst, kleborate and abricate
-* sequence_list.txt: List of all samples that have been analysed
-* successful_sequences.txt: List of all samples that were successfully assembled
-* failed_sequences.txt: List of any samples that failed any stage of the pipeline
-* logs: Will contain run-logs from each tool for each sample
-* AsmPipe_date_time.csv: Overall summary report of: Species, ST, no. reads, GC%, no. contigs, largest contig, total sequence length, N50, L50 and sequence depth.
-
+* fastq: Any FASTQ-files that have been processed are placed here
+* trimmed_reads: The trimmed reads from Trim Galore are placed here
+* fasta: The FASTA-file from assembly will be placed here
+* gfa: The GFA-file from assembly will be placed here
+* reports: Contains reports from FastQC, MultiQC, Quast, mlst, fast_count, Kleborate, rMLST and KmerFinder. Also contains an overall summary
+  report of: Species, ST, no. reads, GC%, no. contigs, largest contig, total sequence length, N50, L50 and sequence depth.
+* logs: Contains run-logs from Trim Galore and SPAdes (or Unicycler).
+ 
 
 ## Detailed explanation
 
 * FastQC performs quality assessment of raw reads, indicating number of reads, GC%, adapter content, sequence length distribution, and more
-* TrimGalore - trims raw reads based on adapter sequences and Phred quality: trims 1 bp off 3' end of every read, removes low-quality (<Phred 20) 3' ends, removes adapter sequences and removes read-pairs if either of the reads' length is <20 bp
-* Unicycler functions as a SPAdes optimiser with short-reads only, and pilon polishing attempts to make imporvements on the genome
+* Trim Galore - trims raw reads based on adapter sequences and Phred quality: trims 1 bp off 3' end of every read, removes low-quality (<Phred 20) 3' ends, removes adapter sequences and removes read-pairs if either of the reads' length is <20 bp
+* SPAdes is a short-read genome assembler. Unicycler functions as a SPAdes optimiser with short-reads only. Unicycler v0.4.8 uses pilon polishing to attempt to make improvements on the genome
 * Quast quality assessment on assembly outputs the total length, GC%, number of contigs, N50, L50 and more. 
-* MLST attempts to identify species and mlst based on the PubMLST schemes. Other tools may be needed for specification, e.g. Kleborate identifies locus variants for Klebsiella samples and separates klebsiella pneumoniae sensu lato into subspecies
-* Sequencing depth (X) - maps the reads against their assembled fasta-file to calculate the overall average depth of the genome.
+* mlst attempts to identify species and MLST based on the PubMLST schemes. Other tools may be needed for specification, e.g. Kleborate identifies locus variants for Klebsiella samples and separates klebsiella pneumoniae sensu lato into subspecies
+* The overall average depth of the genome is calculated based on total length in bp from fast_count and total_length from quast.
+
 
 Things to check QC-wise
 * That GC% matches the sample species
 * That the total length matches the sample species
 * That you do not have a high number of contigs (ideally <500)
 * That you do not have low average read depth (ideally >40X)
-* A low number og long contigs is preferable to a high number of contigs with short contigs
-
-## License
-[GNU General Public License, v3](https://www.gnu.org/licenses/gpl-3.0.html)
+* A low number of long contigs is preferable to a high number of contigs with short contigs
 
 ## Updates
+2023-10-25: Updated the pipeline to nextflow pipeline. SPAdes is now the default assembler. Added option to run KmerFinder and rMLST. Switched out bwa with fast_count for read depth calculation. 
+
 2022-02-03: Updated pipeline to work with newest release of Unicycler (v0.5.0). Unicycler no longer uses pilon for polishing and read error correction is by default turned off, so these options have been removed from the pipeline. Also removed option for abricate as it does not work. Also updated some terms to stop confusion: The folder "assemblies" is now "fasta", "coverage" is now "read depth", and the final report from the pipeline is prefixed with "Asmbl" rather than "AsmPipe".
 
-2021-04-21: Added version checks, fixed a bug with threading and most importantly: Added the flag `--no_correct` to the unicycler command to turn off spades read error correction. This is not needed as the files are QC'd with trim-galore first.
+2021-04-21: Added version checks, fixed a bug with threading and most importantly: Added the flag `--no_correct` to the Unicycler command to turn off SPAdes read error correction. This is not needed as the files are QC'd with Trim Galore first.
 
 2019-07-18: Added options to find \*fastq-gz files in subdirectories from previuos runs
 
-2019-07-18: Added options to not run parts of the pipeline, and added option to run kleborate (https://github.com/katholt/Kleborate) at the end of the pipeline
+2019-07-18: Added options to not run parts of the pipeline, and added option to run Kleborate (https://github.com/katholt/Kleborate) at the end of the pipeline
 
-2019-10-29: Added options to run ABRICATE as part of the pipeline, and created output-folder "analyses" to put mlst, kleborate and ABRICATE-outputs in. Also added merge_runs.sh which you can use to merge two parent folders with the same structure (from this script). 
+2019-10-29: Added options to run ABRICATE as part of the pipeline, and created output-folder "analyses" to put mlst, Kleborate and ABRICATE-outputs in. Also added merge_runs.sh which you can use to merge two parent folders with the same structure (from this script). 
 
 2019-10-30: Updated tool versions in README.
-
