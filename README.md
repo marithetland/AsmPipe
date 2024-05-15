@@ -1,5 +1,5 @@
 # Asmbl-nf
- Short read assembly pipeline (nextflow)
+Short read assembly pipeline (nextflow)
 
 # Asmbl
 **Assembly and quality assessment of short-read Illumina data**
@@ -28,7 +28,9 @@ mamba create -n asmbl_env -c bioconda -c conda-forge pandas blast fastqc multiqc
 ```
 
 Activate the conda environment: 
+```
 conda activate asmbl_env
+```
 
 Clone the github repo and set up:
 ```
@@ -40,6 +42,7 @@ Download fast_count:
 git clone https://github.com/rrwick/MinION-desktop.git
 cd MinION-desktop
 make
+cd ..
 ```
 
 Optional:
@@ -49,6 +52,7 @@ Kleborate:
 git clone --recursive https://github.com/katholt/Kleborate.git
 cd Kleborate/kaptive
 git pull https://github.com/katholt/Kaptive master
+cd ../..
 ```
 
 Update Kleborate database:
@@ -58,6 +62,7 @@ python3 getmlst.py --species "Klebsiella pneumoniae"
 mv Klebsiella_pneumoniae.fasta ../kleborate/data
 mv profiles_csv ../kleborate/data/kpneumoniae.txt
 rm -f ../kleborate/data/Klebsiella_pneumoniae.fasta.n*
+cd ../..
 ```
 
 kmerfinder:
@@ -71,6 +76,8 @@ wget https://cge.food.dtu.dk/services/KmerFinder/etc/kmerfinder_db.tar.gz
 tar -xvf kmerfinder_db.tar.gz README.md VALIDATE.py bacteria bacteria.md5 config
 rm kmerfinder_db.tar.gz
 ```
+
+The dependencies are installed with mamba and will be found in global path. The full path to the optional tools/dbs must be specified in the `nextflow.config` file.
 
 ## Usage
 
@@ -93,17 +100,14 @@ There are several options that can be set by modifying the nextflow.config file:
 | `params.fast_count_path`          | Specify the path to fast_count                                    |                            |    9                |
 | `params.kleborate_path`           | Specify the path to Kleborate                                     |                            |   12                |
 | `kmerfinder_db`                   | Specify the path to kmerfinder_db/bacteria/                       |                            |   15                |
-
 | `trim`                            | Run Trim_galore (true/false)                                      | true                       |   24                |
 | `unicycler048`                    | Run Unicycler v0.4.8 for assembly (true/false)                    | false                      |   27                |
 | `unicycler050`                    | Run Unicycler v0.5.0 for assembly (true/false)                    | false                      |   28                |
 | `kleborate`                       | Run Kleborate (true/false)                                        | false                      |   31                |
 | `rmlst`                           | Run rMLST (true/false)                                            | false                      |   34                |
 | `kmerfinder`                      | Run KmerFinder (true/false)                                       | false                      |   35                |
-
 | `fast`                            | Run with 72 threads rather than 36 (true/false)                   | false                      |   45                |
-
-| `depth_filter`                    | Depth_filter for Unicycler                                        | 0.25                       |   64                |
+| `depth_filter`                    | Depth_filter for Unicycler (note SPAdes is default)               | 0.25                       |   64                |
 | `reads_type1`                     | Specify input reads type 1                                        | ./*L001_R{1,2}_001.fastq.gz|   67                |
 | `reads_type2`                     | Specify input reads type 2                                        | ./*_{1,2}.fastq.gz         |   68                |
 | `failure_action`                  | Specify the nextflow error strategy (terminate/ignore/finish)     | ignore                     |   71                |
