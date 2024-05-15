@@ -48,6 +48,7 @@ process VERSIONS {
         script:
         """
         echo "Program\tVersion" >> versions.txt
+        echo "Asmbl\tv1.0.0" >> versions.txt
         if [ $params.unicycler048 == true ]; then ${params.unicycler048_path}unicycler --version >> versions.txt ; elif [ $params.unicycler050 == true ]; then unicycler --version >> versions.txt ; fi
         if [ $params.unicycler048 == true ]; then ${params.unicycler048_path}spades.py --version >> versions.txt ; else spades.py --version >> versions.txt ; fi
         trim_galore --version | grep version | tr -d " " | sed "s/^/trim_galore\t/g" >> versions.txt
